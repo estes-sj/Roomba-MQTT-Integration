@@ -57,6 +57,8 @@ These commands are what are publishable to the MQTT server roomba/commands topic
 | Play Song 1 | `play_song1` | Plays the 5-note McDonald's Jingle |
 | Play Song 2 | `play_song2` | Plays the Among Us song |
 | Play Song 3 | `play_song3` | Plays 'A Cruel Angel's Thesis' song |
+| Play Song 3 | `play_song4` | Plays 'Jingle Bell Rock' song |
+| Play Song 3 | `play_song5` | Plays 'Last Christmas' song |
 
 #### MQTT Topics
 
@@ -254,6 +256,7 @@ mqtt:
       - unique_id: roomba_sensor_battery
         name: "Roomba Battery"
         state_topic: "roomba/battery"
+        expire_after: 30 # Used for tracking when Roomba is offline
         icon: mdi:battery
       - unique_id: roomba_sensor_charging_value
         name: "Roomba Charging Value"
@@ -311,6 +314,11 @@ mqtt:
         name: "Roomba Song 4"
         command_topic: "roomba/commands"
         payload_press: "play_song4"
+        icon: mdi:music-note
+      - unique_id: roomba_button_play_song5
+        name: "Roomba Song 5"
+        command_topic: "roomba/commands"
+        payload_press: "play_song5"
         icon: mdi:music-note
 ```
 
@@ -422,12 +430,14 @@ the below Home Assistant screenshot.
     entity_id: switch.roomba
 ```
 
-Notify that a physical disconnection happened via Alexa and iOS (use case: Roomba ran into something that caused loose/broken physical connections).
+Notify that a physical disconnection happened via Alexa and/or iOS (use case: Roomba ran into something that caused loose/broken physical connections).
 `automations.yaml`
+
+1. Send an iOS emergency alert when the user is home. Triggers via NO DATA.
 
 ```
 - id: 'XXXXXXXXX' # Redacted
-  alias: Roomba Disconnected - Send Alerts
+  alias: Roomba Disconnected - Send Alerts (iOS)
   description: When the Roomba battery changes to "NO DATA," this is an indication
     that we have lost signal to the Roomba.
   trigger:
@@ -435,7 +445,44 @@ Notify that a physical disconnection happened via Alexa and iOS (use case: Roomb
     entity_id:
     - sensor.roomba_battery
     to: NO DATA
-  condition: []
+  condition:
+  - type: is_off
+    condition: device
+    device_id: XXXXXXXXX # Redacted
+    entity_id: XXXXXXXXX # Redacted
+    domain: binary_sensor
+  action:
+  - service: notify.mobile_app_iphone
+    data:
+      title: Roomba Disconnected
+      message: Roomba MQTT Disconnected!
+      data:
+        push:
+          sound:
+            name: default
+            critical: 1
+            volume: 1
+  mode: single
+```
+
+2. Notify on Alexa if user is not home. Triggers via NO DATA. (For someone else to hopefully hear)
+
+```
+- id: 'XXXXXXXXX' # Redacted
+  alias: Roomba Disconnected - Send Alerts (Alexa Alarm)
+  description: 'When the Roomba battery changes to "NO DATA," this is an indication
+    that we have lost signal to the Roomba. '
+  trigger:
+  - platform: state
+    entity_id:
+    - sensor.roomba_battery
+    to: NO DATA
+  condition:
+  - condition: not
+    conditions:
+    - condition: zone
+      entity_id: person.samuel_estes
+      zone: zone.home
   action:
   - service: switch.turn_off
     entity_id: switch.roomba
@@ -444,33 +491,96 @@ Notify that a physical disconnection happened via Alexa and iOS (use case: Roomb
     type: notify
     message: Roomba MQTT Disconnected
     title: Roomba No Signal
+    enabled: false
   - service: notify.alexa_media_living_room_show
     data:
       message: Roomba has lost signal. If this is not intentional, please turn the
         Roomba off manually.
+    enabled: true
   - delay:
       hours: 0
       minutes: 0
       seconds: 10
       milliseconds: 0
+    enabled: true
   - service: notify.alexa_media_living_room_show
     data:
       message: Roomba has lost signal. If this is not intentional, please turn the
         Roomba off manually.
+    enabled: true
   - delay:
       hours: 0
       minutes: 0
       seconds: 10
       milliseconds: 0
+    enabled: true
   - service: notify.alexa_media_living_room_show
     data:
       message: Roomba has lost signal. If this is not intentional, please turn the
         Roomba off manually.
+    enabled: true
   - delay:
       hours: 0
       minutes: 0
       seconds: 10
       milliseconds: 0
+    enabled: true
+  mode: single
+```
+
+3. Alternate send an iOS emergency alert when the user is home. Triggers via 'Unavailable' state in the roomba battery. Requires the expire_after: 30 tag on the HA roomba battery sensor.
+   Also assumes that data is supposed to be published to roomba/battery every 5 seconds. Can be combined with the other iOS alert automation (1.).
+
+```
+- id: 'XXXXXXXXX' # Redacted
+  alias: Roomba Disconnected / No MQTT Data - Send Alerts (iOS)
+  description: 'Another test case for checking if the Roomba is connected to the MQTT
+    server. With roomba_sensor_battery containing the expire_after: 30 tag, an Unavailable
+    state occurs when no new data after 30 seconds. The roomba is currently set to
+    update this data every 5 seconds when functional. This should not conflict with
+    a software error on the Roomba side since that will instead display NO DATA which
+    triggers a different automation.
+
+    This only occurs in the daytime hours to prevent an unintended emergency alert
+    at night.'
+  trigger:
+  - platform: state
+    entity_id:
+    - sensor.roomba_battery
+    from:
+    to: unavailable
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 15
+  condition:
+  - condition: time
+    after: 09:00:00
+    before: '22:00:00'
+    weekday:
+    - mon
+    - wed
+    - thu
+    - fri
+    - sat
+    - tue
+    - sun
+  - type: is_off
+    condition: device
+    device_id: XXXXXXXXX # Redacted
+    entity_id: XXXXXXXXX # Redacted
+    domain: binary_sensor
+  action:
+  - service: notify.mobile_app_iphone
+    data:
+      title: Roomba Disconnected
+      message: Roomba MQTT Disconnected!
+      data:
+        push:
+          sound:
+            name: default
+            critical: 1
+            volume: 1
   mode: single
 ```
 

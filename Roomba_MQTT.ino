@@ -17,6 +17,7 @@
 // 2023-09-27 Added more music and changed the structure due to maximum song limitations
 // 2023-11-28 Fix for invalid "Docked" status handling. Innacurate charging value would cause the status
 //            to be "Docked" until receiving the next command.
+// 2024-12-05 Added 2 Christmas songs
 
 #include <PubSubClient.h>
 #include <ESP8266WiFi.h>
@@ -164,6 +165,14 @@ void callback(char* topic, byte* payload, unsigned int length)
     else if (newPayload == "play_song3")
     {
       playSongEvangelion();
+    }
+    else if (newPayload == "play_song4")
+    {
+      playSongJingleBellRock();
+    }
+    else if (newPayload == "play_song5")
+    {
+      playSongLastChristmas();
     }
     else if (newPayload == "restart")
     {
@@ -350,6 +359,102 @@ void playSongEvangelion()
   delay(50);
 }
 
+// Plays Jingle Bell Rock
+void playSongJingleBellRock()
+{
+  timer.disable(timerId[0]);
+  delay(50);
+  switchStoredSong("Jingle Bell Rock");
+  delay(50);
+  client.publish("roomba/status", "Playing Jingle Bell Rock");
+  Serial.write(128);
+  delay(50);
+  Serial.write(131);
+  delay(50);
+  Serial.write(141);
+  delay(50);
+  Serial.write(0);
+  delay(50);
+  delay(3501); // Duration of part 1 minus delays + 1
+  Serial.write(128);
+  delay(50);
+  Serial.write(131);
+  delay(50);
+  Serial.write(141);
+  delay(50);
+  Serial.write(1);
+  delay(4001); // Duration of part 2 minus delays
+  Serial.write(128);
+  delay(50);
+  Serial.write(131);
+  delay(50);
+  Serial.write(141);
+  delay(50);
+  Serial.write(2);
+  delay(50);
+  delay(4001); // Duration of part 3 minus delays
+  Serial.write(128);
+  delay(50);
+  Serial.write(131);
+  delay(50);
+  Serial.write(141);
+  delay(50);
+  Serial.write(3);
+  delay(3251); // Duration of part 4 minus delays; Prevents spamming the song
+  timer.enable(timerId[0]);
+  timer.restartTimer(timerId[0]);
+  client.publish("roomba/status", lastStatus);
+  delay(50);
+}
+
+// Plays Last Christmas
+void playSongLastChristmas()
+{
+  timer.disable(timerId[0]);
+  delay(50);
+  switchStoredSong("Last Christmas");
+  delay(50);
+  client.publish("roomba/status", "Playing Last Christmas");
+  Serial.write(128);
+  delay(50);
+  Serial.write(131);
+  delay(50);
+  Serial.write(141);
+  delay(50);
+  Serial.write(0);
+  delay(50);
+  delay(3657); // Duration of part 1 minus delays + 1
+  Serial.write(128);
+  delay(50);
+  Serial.write(131);
+  delay(50);
+  Serial.write(141);
+  delay(50);
+  Serial.write(1);
+  delay(5062); // Duration of part 2 minus delays
+  Serial.write(128);
+  delay(50);
+  Serial.write(131);
+  delay(50);
+  Serial.write(141);
+  delay(50);
+  Serial.write(2);
+  delay(50);
+  delay(3313); // Duration of part 3 minus delays
+  Serial.write(128);
+  delay(50);
+  Serial.write(131);
+  delay(50);
+  Serial.write(141);
+  delay(50);
+  Serial.write(3);
+  delay(4782); // Duration of part 4 minus delays; Prevents spamming the song
+  timer.enable(timerId[0]);
+  timer.restartTimer(timerId[0]);
+  client.publish("roomba/status", lastStatus);
+  delay(50);
+}
+
 // Plays the McDonald's Jingle
 // This is used at startup only
 void playStartupSong()
@@ -440,7 +545,7 @@ void switchStoredSong(String song_name) {
       Serial.write(songData[i]);
       delay(50); // Delay between sending bytes (adjust as needed)
     }
-  } 
+  }
   else if (song_name.equalsIgnoreCase("Among Us")) 
   {
     // Code to play the "Among Us" song
@@ -493,6 +598,110 @@ void switchStoredSong(String song_name) {
     64, 20,
     69, 20,
     67, 30
+    };
+    // Send the song data to the Roomba
+    for (int i = 0; i < sizeof(songData); i++) {
+      Serial.write(songData[i]);
+      delay(50); // Delay between sending bytes (adjust as needed)
+    }
+  }
+  else if (song_name.equalsIgnoreCase("Jingle Bell Rock")) 
+  {
+    // Code to play the "Jingle Bell Rock" song
+    // Replace this comment with your actual code
+    current_song = "Jingle Bell Rock"; // Update the current song name
+    byte songData[] = {
+    140, 0, 10, // Jingle Bell Rock (part 1)
+    72, 16, // C4 eighth
+    72, 16, // C4 eighth
+    72, 32, // C4 quarter
+    71, 16, // B3 eighth
+    71, 16, // B3 eighth
+    71, 32, // B3 quarter
+    69, 16, // A3 eighth
+    71, 16, // B3 eighth
+    69, 16, // A3 eighth
+    64, 44, // E3 eighth + quarter (Changed from 48 to 44 to have a 50+ ms delay)
+    140, 1, 10, // Jingle Bell Rock (part 2)
+    69, 16, // A3 eighth
+    71, 16, // B3 eighth
+    69, 16, // A3 eighth
+    64, 48, // E3 eighth + quarter
+    67, 32, // G3 quarter
+    69, 16, // A3 eighth
+    71, 16, // B3 eighth
+    69, 16, // A3 eighth
+    65, 48, // F3 eighth + quarter
+    0, 28,  // quarter rest (Changed from 32 to 28 to have a 50+ ms delay)
+    140, 2, 10, // Jingle Bell Rock (part 3)
+    62, 16, // D3 eighth
+    64, 32, // E3 quarter
+    65, 16, // F3 eighth
+    67, 16, // G3 eighth
+    69, 32, // A3 quarter
+    67, 16, // G3 eighth
+    62, 16, // D3 eighth
+    64, 16, // E3 eighth
+    65, 16, // F3 eighth
+    67, 76, // G3 eighth + half (Changed from 80 to 76 to have a 50+ ms delay)
+    140, 3, 6, // Jingle Bell Rock (part 4)
+    0, 16,  // eighth rest
+    69, 32, // A3 quarter
+    69, 16, // A3 eighth
+    71, 32, // B3 quarter
+    67, 16, // G3 eighth
+    72, 96 // C4 quarter + half
+    };
+    // Send the song data to the Roomba
+    for (int i = 0; i < sizeof(songData); i++) {
+      Serial.write(songData[i]);
+      delay(50); // Delay between sending bytes (adjust as needed)
+    }
+  }
+  else if (song_name.equalsIgnoreCase("Last Christmas")) 
+  {
+    // Code to play the "Last Christmas" song
+    // Replace this comment with your actual code
+    current_song = "Last Christmas"; // Update the current song name
+    byte songData[] = {
+    140, 0, 8, // Last Christmas (part 1)
+    64, 54, // E3 dotted quarter
+    64, 36, // E3 eighth+eighth
+    62, 36, // D3 quarter
+    62, 18, // D3 eighth
+    64, 18, // E3 eighth
+    64, 18, // E3 eighth
+    66, 18, // F#3 eighth
+    62, 32, // D3 eighth + eighth (Changed from 36 to 32 to have a 50+ ms delay)
+    140, 1, 11, // Last Christmas (part 2)
+    59, 18, // B2 eighth
+    59, 18, // B2 eighth
+    64, 18, // E3 eighth
+    64, 18, // E3 eighth
+    66, 36, // F#3 quarter
+    62, 54, // D3 dotted quarter
+    59, 18, // B2 eighth
+    61, 18, // C#3 eighth
+    62, 18, // D3 eighth
+    61, 18, // C#3 eighth 
+    59, 86, // B2 eighth + half (-4)
+    140, 2, 7, // Last Christmas (part 3)
+    66, 36, // F#3 quarter
+    64, 54, // E3 eighth + dotted quarter
+    64, 18, // E3 eighth
+    66, 18, // F#3 eighth
+    67, 18, // G3 eighth
+    66, 18, // F#3 eighth
+    64, 50, // E3 eighth + dotted quarter (-4)
+    140, 3, 8, // Last Christmas (part 4)
+    62, 18, // D3 eighth
+    61, 18, // C#3 eighth
+    61, 18, // C#3 eighth
+    62, 18, // D3 eighth
+    61, 36, // C#3 eighth + eighth
+    62, 36, // D3 quarter
+    61, 36, // C#3 eighth + eighth
+    57, 122 // A2 dotted quarter + half (-4)
     };
     // Send the song data to the Roomba
     for (int i = 0; i < sizeof(songData); i++) {
