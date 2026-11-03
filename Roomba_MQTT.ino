@@ -18,6 +18,8 @@
 // 2023-11-28 Fix for invalid "Docked" status handling. Innacurate charging value would cause the status
 //            to be "Docked" until receiving the next command.
 // 2024-12-05 Added 2 Christmas songs
+// 2026-11-05 Added remote control: roomba/drive topic (Drive Direct), drive_on/drive_off and
+//            vacuum_on/vacuum_off commands, and a watchdog that stops the wheels when input stops
 
 #include <PubSubClient.h>
 #include <ESP8266WiFi.h>
@@ -59,6 +61,14 @@ const char* lastStatus = "Waiting";
 String current_song = "McDonalds";
 bool setupComplete = false; // Flag to track setup completion
 
+// Remote control
+const int maxWheelSpeed = 500;                   // mm/s, OI limit for Drive Direct
+const unsigned long driveWatchdogMs = 600;       // Stop the wheels if no drive message arrives in this time
+const unsigned long driveIdleTimeoutMs = 300000; // Leave drive mode after 5 minutes without input
+bool driveMode = false;
+bool wheelsMoving = false;
+unsigned long lastDriveMs = 0;
+
 // Functions
 
 //////////////////////////////////////////////////////////////
@@ -98,6 +108,8 @@ void reconnect()
 
         // ... and resubscribe
         client.subscribe("roomba/commands");
+        client.subscribe("roomba/drive");
+        publishDriveState();
       } 
       else 
       {
@@ -122,19 +134,47 @@ void callback(char* topic, byte* payload, unsigned int length)
   String newTopic = topic;
   payload[length] = '\0';
   String newPayload = String((char *)payload);
+  if (newTopic == "roomba/drive")
+  {
+    handleDrive(newPayload);
+    return;
+  }
   if (newTopic == "roomba/commands") 
   {
 
-    // Ensure Roomba is awake so that it can listen for a command
-    if (!timer.isEnabled(timerId[1]))
+    // Ensure Roomba is awake so that it can listen for a command.
+    // Drive mode already woke it, and waking again would block for ~3 seconds.
+    if (!timer.isEnabled(timerId[1]) && !driveMode)
     {
       wakeUp();
+    }
+
+    // Songs block for several seconds, so never leave the wheels turning
+    if (newPayload.startsWith("play_song"))
+    {
+      stopWheels();
     }
     
     // Execute the appropriate function based off the MQTT message
     // When adding command execution to Home Assistant, these are all
     // the current available commands through MQTT
-    if (newPayload == "start")
+    if (newPayload == "drive_on")
+    {
+      startDriveMode();
+    }
+    else if (newPayload == "drive_off")
+    {
+      stopDriveMode();
+    }
+    else if (newPayload == "vacuum_on")
+    {
+      setCleaningMotors(true);
+    }
+    else if (newPayload == "vacuum_off")
+    {
+      setCleaningMotors(false);
+    }
+    else if (newPayload == "start")
     {
       startCleaning();
     }
@@ -188,6 +228,7 @@ void callback(char* topic, byte* payload, unsigned int length)
 // Initiates the standard cleaning cycle
 void startCleaning()
 {
+  leaveDriveMode();
   Serial.write(128);
   delay(50);
   Serial.write(131);
@@ -200,6 +241,7 @@ void startCleaning()
 // Will maximize the cleaning time based off battery life
 void startMaxCleaning()
 {
+  leaveDriveMode();
   Serial.write(128);
   delay(50);
   Serial.write(131);
@@ -212,6 +254,7 @@ void startMaxCleaning()
 // Focuses on specific current area
 void startSpotCleaning()
 {
+  leaveDriveMode();
   Serial.write(128);
   delay(50);
   Serial.write(131);
@@ -224,6 +267,7 @@ void startSpotCleaning()
 // Initiates the "seek dock" command
 void stopCleaning()
 {
+  leaveDriveMode();
   Serial.write(128);
   delay(50);
   Serial.write(131);
@@ -239,6 +283,7 @@ void stopCleaning()
 // Halts the roomba by turning the power off and on
 void stopNow()
 {
+  leaveDriveMode();
   Serial.write(128);
   delay(50);
   Serial.write(131);
@@ -248,6 +293,126 @@ void stopNow()
   wakeUp();
   lastStatus = "Halted";
   client.publish("roomba/status", lastStatus);
+}
+
+//////////////////////////////////////////////////////////////
+// Remote Control
+//////////////////////////////////////////////////////////////
+
+// Sends OI Drive Direct (145): right then left wheel velocity, signed 16-bit mm/s
+void driveDirect(int left, int right)
+{
+  left = constrain(left, -maxWheelSpeed, maxWheelSpeed);
+  right = constrain(right, -maxWheelSpeed, maxWheelSpeed);
+  Serial.write(145);
+  Serial.write((uint8_t)((right >> 8) & 0xFF));
+  Serial.write((uint8_t)(right & 0xFF));
+  Serial.write((uint8_t)((left >> 8) & 0xFF));
+  Serial.write((uint8_t)(left & 0xFF));
+  wheelsMoving = (left != 0 || right != 0);
+}
+
+void stopWheels()
+{
+  if (driveMode || wheelsMoving)
+  {
+    driveDirect(0, 0);
+  }
+}
+
+void publishDriveState()
+{
+  client.publish("roomba/drive/state", driveMode ? "on" : "off");
+}
+
+// Puts the Roomba in Safe mode so it accepts wheel commands.
+// Safe mode keeps the cliff and wheel-drop protections active.
+void startDriveMode()
+{
+  Serial.write(128);
+  delay(50);
+  Serial.write(131);
+  delay(50);
+  driveMode = true;
+  lastDriveMs = millis();
+  driveDirect(0, 0);
+  lastStatus = "Remote";
+  client.publish("roomba/status", lastStatus);
+  publishDriveState();
+}
+
+// Stops the wheels and cleaning motors and leaves drive mode
+void stopDriveMode()
+{
+  if (!driveMode)
+  {
+    publishDriveState();
+    return;
+  }
+  driveDirect(0, 0);
+  setCleaningMotors(false);
+  driveMode = false;
+  lastStatus = "Waiting";
+  client.publish("roomba/status", lastStatus);
+  publishDriveState();
+}
+
+// Called by the cleaning commands so a cleaning cycle never fights the remote
+void leaveDriveMode()
+{
+  if (driveMode)
+  {
+    driveDirect(0, 0);
+    driveMode = false;
+    publishDriveState();
+  }
+}
+
+// Payload: "<left>,<right>" wheel speeds in mm/s
+void handleDrive(String payload)
+{
+  if (!driveMode)
+  {
+    return; // Ignore stray input until drive mode is turned on
+  }
+  int comma = payload.indexOf(',');
+  if (comma < 0)
+  {
+    return;
+  }
+  int left = payload.substring(0, comma).toInt();
+  int right = payload.substring(comma + 1).toInt();
+  driveDirect(left, right);
+  lastDriveMs = millis();
+}
+
+// OI Motors (138): bit 0 side brush, bit 1 vacuum, bit 2 main brush
+void setCleaningMotors(bool on)
+{
+  if (!driveMode)
+  {
+    return; // Cleaning modes control the motors themselves
+  }
+  Serial.write(138);
+  Serial.write(on ? 7 : 0);
+}
+
+// Stops the wheels if the controller stops sending, and leaves drive mode after a long idle
+void checkDriveWatchdog()
+{
+  if (!driveMode)
+  {
+    return;
+  }
+  unsigned long idle = millis() - lastDriveMs;
+  if (wheelsMoving && idle > driveWatchdogMs)
+  {
+    driveDirect(0, 0);
+  }
+  if (idle > driveIdleTimeoutMs)
+  {
+    stopDriveMode();
+  }
 }
 
 // Used for resetting the microcontroller
@@ -757,7 +922,11 @@ void initializeStartingMusic()
 //////////////////////////////////////////////////////////////
 
 void sendInfoRoomba() {
-  roomba.start();
+  // Start (128) drops the Roomba to Passive mode, which would ignore wheel commands
+  if (!driveMode)
+  {
+    roomba.start();
+  }
   // Charging State
   roomba.getSensors(21, tempBuf, 1);
   battery_Voltage = tempBuf[0];
@@ -796,7 +965,11 @@ void sendInfoRoomba() {
 
   // Communication with the roomba can be iffy with values such as 8 or 200 appearing incorrectly.
   // If an unexpected value appears, no new message is published
-  if (battery_Voltage > 0 && battery_Voltage <= 5)
+  if (driveMode)
+  {
+    // Status stays "Remote" while driving; charging values are noisy while moving
+  }
+  else if (battery_Voltage > 0 && battery_Voltage <= 5)
   {
     // Save the current non-Docked status before changing it to "Docked" in case we need to revert back
     if (strcmp(lastStatus, "Docked") != 0)
@@ -905,8 +1078,11 @@ void loop()
 {
   if (!client.connected()) 
   {
+    // reconnect() blocks, so the watchdog can't run: stop the wheels first
+    stopWheels();
     reconnect();
   }
   client.loop();
+  checkDriveWatchdog();
   timer.run();
 }
