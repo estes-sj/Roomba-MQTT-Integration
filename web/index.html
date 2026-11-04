@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#14161a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Roomba Remote</title>
+<style>
+  :root {
+    --bg: #14161a;
+    --panel: #1d2026;
+    --panel-2: #262a32;
+    --line: #333844;
+    --text: #e8eaee;
+    --muted: #8b92a0;
+    --accent: #3ddc97;
+    --accent-ink: #062b1b;
+    --warn: #f2b84b;
+    --danger: #ef5b5b;
+    --danger-ink: #2e0707;
+    --knob: #e8eaee;
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #eef0f3;
+      --panel: #ffffff;
+      --panel-2: #f3f4f7;
+      --line: #d9dce3;
+      --text: #15181d;
+      --muted: #5f6673;
+      --accent: #12a66a;
+      --accent-ink: #ffffff;
+      --knob: #15181d;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    display: flex; flex-direction: column; gap: 12px;
+    max-width: 560px; margin: 0 auto;
+    user-select: none; -webkit-user-select: none;
+    overscroll-behavior: none;
+  }
+  button { font: inherit; color: inherit; }
+
+  /* Status bar */
+  .status {
+    display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 10px 12px;
+  }
+  .status .state { font-weight: 600; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status .sub { color: var(--muted); font-size: 13px; display: flex; gap: 6px; align-items: center; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex: none; }
+  .dot.ok { background: var(--accent); }
+  .dot.wait { background: var(--warn); }
+  .battery { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel-2); display: grid; place-items: center; cursor: pointer;
+  }
+  .icon-btn svg { width: 20px; height: 20px; }
+
+  /* Drive area */
+  .drive {
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px; display: flex; flex-direction: column; gap: 14px; align-items: center;
+  }
+  .drive-head { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .toggle {
+    border: 1px solid var(--line); background: var(--panel-2); border-radius: 999px;
+    padding: 10px 18px; font-weight: 600; cursor: pointer; min-width: 132px;
+  }
+  .toggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .pad-hint { color: var(--muted); font-size: 13px; text-align: right; }
+
+  .stage { position: relative; display: grid; grid-template-columns: 14px minmax(0, 1fr) 14px; gap: 14px; width: 100%; align-items: center; }
+  .wheel { height: 100%; min-height: 180px; background: var(--panel-2); border-radius: 9px; position: relative; overflow: hidden; }
+  .wheel i { position: absolute; left: 0; right: 0; top: 50%; height: 0; background: var(--accent); transition: height .08s, top .08s; }
+  .wheel::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line); }
+
+  .pad {
+    justify-self: center; width: 100%; max-width: 300px; aspect-ratio: 1; border-radius: 50%;
+    background:
+      radial-gradient(circle, transparent 0 32%, var(--line) 32% calc(32% + 1px), transparent calc(32% + 1px)),
+      var(--panel-2);
+    border: 1px solid var(--line); position: relative; touch-action: none;
+  }
+  .pad::before, .pad::after { content: ""; position: absolute; background: var(--line); }
+  .pad::before { left: 50%; top: 10%; bottom: 10%; width: 1px; }
+  .pad::after { top: 50%; left: 10%; right: 10%; height: 1px; }
+  .knob {
+    position: absolute; left: 50%; top: 50%; width: 34%; aspect-ratio: 1; border-radius: 50%;
+    background: var(--knob); transform: translate(-50%, -50%); z-index: 1;
+    box-shadow: 0 6px 18px rgb(0 0 0 / .35);
+  }
+  .knob.live { transition: none; }
+  .knob:not(.live) { transition: transform .15s ease-out; }
+  .drive.off .pad { opacity: .45; }
+
+  .speed { width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; color: var(--muted); font-size: 13px; }
+  .speed output { font-variant-numeric: tabular-nums; color: var(--text); min-width: 66px; text-align: right; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+
+  /* Command grid */
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .grid h2 { grid-column: 1 / -1; margin: 6px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+  .cmd {
+    border: 1px solid var(--line); background: var(--panel); border-radius: 12px;
+    padding: 12px 6px; cursor: pointer; font-weight: 500; font-size: 14px; min-height: 48px;
+  }
+  .cmd:active { background: var(--panel-2); }
+  .cmd.wide { grid-column: span 2; }
+  .cmd.danger { background: var(--danger); color: var(--danger-ink); border-color: transparent; font-weight: 700; }
+  .cmd[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+
+  .gp { color: var(--muted); font-size: 13px; text-align: center; }
+  .gp b { color: var(--text); font-weight: 600; }
+
+  /* Settings */
+  dialog {
+    border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text);
+    width: min(92vw, 420px); padding: 18px;
+  }
+  dialog::backdrop { background: rgb(0 0 0 / .55); }
+  dialog h2 { margin: 0 0 12px; font-size: 18px; }
+  dialog label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  dialog input {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); font: inherit;
+  }
+  dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  dialog p { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+  .toast {
+    position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+    background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 999px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: opacity .2s; max-width: calc(100vw - 32px);
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header class="status">
+  <div>
+    <div class="state" id="status">Not connected</div>
+    <div class="sub"><span class="dot" id="connDot"></span><span id="connText">Offline</span></div>
+  </div>
+  <div class="battery" id="battery" title="Battery">--%</div>
+  <button class="icon-btn" id="openSettings" aria-label="Connection settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+  </button>
+</header>
+
+<section class="drive off" id="drive">
+  <div class="drive-head">
+    <button class="toggle" id="driveToggle" aria-pressed="false">Drive: Off</button>
+    <div class="pad-hint" id="padHint">Turn on Drive to steer</div>
+  </div>
+  <div class="stage">
+    <div class="wheel" aria-label="Left wheel"><i id="wheelL"></i></div>
+    <div class="pad" id="pad" aria-label="Joystick"><div class="knob" id="knob"></div></div>
+    <div class="wheel" aria-label="Right wheel"><i id="wheelR"></i></div>
+  </div>
+  <div class="speed">
+    <span>Speed</span>
+    <input type="range" id="speed" min="100" max="500" step="25" value="250">
+    <output id="speedOut">250 mm/s</output>
+  </div>
+</section>
+
+<section class="grid">
+  <h2>Cleaning</h2>
+  <button class="cmd" data-cmd="start">Clean</button>
+  <button class="cmd" data-cmd="spot_clean">Spot</button>
+  <button class="cmd" data-cmd="max_clean">Max</button>
+  <button class="cmd" data-cmd="stop">Dock</button>
+  <button class="cmd wide" id="vacuum" aria-pressed="false">Vacuum while driving</button>
+  <button class="cmd wide danger" data-cmd="halt">Halt</button>
+  <h2>Songs</h2>
+  <button class="cmd" data-cmd="play_song1">McD</button>
+  <button class="cmd" data-cmd="play_song2">Among Us</button>
+  <button class="cmd" data-cmd="play_song3">Eva</button>
+  <button class="cmd" data-cmd="play_song4">Bell Rock</button>
+  <button class="cmd" data-cmd="play_song5">Last Xmas</button>
+</section>
+
+<div class="gp" id="gp">No controller. Pair one to this device and press a button.</div>
+
+<dialog id="settings">
+  <form method="dialog" id="settingsForm">
+    <h2>Connection</h2>
+    <label for="url">Broker WebSocket URL</label>
+    <input id="url" placeholder="ws://192.168.22.62:9001" autocomplete="off" inputmode="url">
+    <label for="user">Username</label>
+    <input id="user" autocomplete="username">
+    <label for="pass">Password</label>
+    <input id="pass" type="password" autocomplete="current-password">
+    <p>Saved on this device only. Use an MQTT account limited to <code>roomba/#</code>.</p>
+    <div class="row">
+      <button class="cmd" value="cancel" formnovalidate>Cancel</button>
+      <button class="cmd" value="save" style="background:var(--accent);color:var(--accent-ink);border-color:transparent">Save &amp; connect</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script src="vendor/mqtt.min.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Config ----------
+  const TOPIC_CMD = 'roomba/commands';
+  const TOPIC_DRIVE = 'roomba/drive';
+  const SEND_MS = 100;        // Repeat rate while input is held (firmware watchdog is 600 ms)
+  const DEADZONE = 0.12;
+  const TURN_GAIN = 0.6;      // How hard the stick's x-axis turns
+  const MAX_WHEEL = 500;
+  const SONGS = ['play_song1', 'play_song2', 'play_song3', 'play_song4', 'play_song5'];
+
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k, d) { try { return localStorage.getItem('roomba.' + k) ?? d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('roomba.' + k, v); } catch {} },
+  };
+
+  // ---------- State ----------
+  let client = null;
+  let connected = false;
+  let driveOn = false;
+  let vacuumOn = false;
+  let touch = { x: 0, y: 0, active: false };
+  let pad = { x: 0, y: 0, boost: 0, active: false, prev: [] };
+  let stopRepeats = 0;
+  let songIndex = 0;
+
+  // ---------- UI helpers ----------
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+  function setConn(state, text) {
+    $('connDot').className = 'dot' + (state === 'ok' ? ' ok' : state === 'wait' ? ' wait' : '');
+    $('connText').textContent = text;
+  }
+  function renderDrive() {
+    $('driveToggle').setAttribute('aria-pressed', String(driveOn));
+    $('driveToggle').textContent = driveOn ? 'Drive: On' : 'Drive: Off';
+    $('drive').classList.toggle('off', !driveOn);
+    $('padHint').textContent = driveOn ? 'Drag to drive' : 'Turn on Drive to steer';
+    $('vacuum').setAttribute('aria-pressed', String(vacuumOn && driveOn));
+  }
+  function renderWheels(l, r) {
+    for (const [el, v] of [[$('wheelL'), l], [$('wheelR'), r]]) {
+      const pct = Math.abs(v) / MAX_WHEEL * 50;
+      el.style.height = pct + '%';
+      el.style.top = (v >= 0 ? 50 - pct : 50) + '%';
+    }
+  }
+
+  // ---------- MQTT ----------
+  function defaultUrl() {
+    const host = location.hostname || '192.168.22.62';
+    return (location.protocol === 'https:' ? 'wss://' : 'ws://') + host + ':9001';
+  }
+  function connect() {
+    if (client) { client.end(true); client = null; }
+    const url = store.get('url', defaultUrl());
+    const username = store.get('user', '');
+    const password = store.get('pass', '');
+    if (!username) { setConn('err', 'Set up the connection'); $('openSettings').click(); return; }
+    setConn('wait', 'Connecting…');
+    client = mqtt.connect(url, {
+      username, password,
+      clientId: 'roomba-web-' + Math.random().toString(16).slice(2, 8),
+      reconnectPeriod: 2000, connectTimeout: 5000, clean: true,
+    });
+    client.on('connect', () => {
+      connected = true; setConn('ok', 'Connected');
+      client.subscribe(['roomba/status', 'roomba/battery', 'roomba/drive/state']);
+    });
+    client.on('reconnect', () => setConn('wait', 'Reconnecting…'));
+    client.on('close', () => { connected = false; setConn('err', 'Offline'); });
+    client.on('error', (e) => setConn('err', e.message || 'Error'));
+    client.on('message', (topic, buf) => {
+      const msg = buf.toString();
+      if (topic === 'roomba/status') $('status').textContent = msg;
+      else if (topic === 'roomba/battery') $('battery').textContent = /^\d+$/.test(msg) ? msg + '%' : msg;
+      else if (topic === 'roomba/drive/state') {
+        driveOn = msg === 'on';
+        if (!driveOn) vacuumOn = false;
+        renderDrive();
+      }
+    });
+  }
+  function publish(topic, msg) {
+    if (!client || !connected) return false;
+    client.publish(topic, msg, { qos: 0 });
+    return true;
+  }
+  function command(cmd) {
+    if (!publish(TOPIC_CMD, cmd)) { toast('Not connected'); return; }
+    if (navigator.vibrate) navigator.vibrate(15);
+  }
+
+  // ---------- Drive mixing ----------
+  function mix(x, y, maxSpeed) {
+    const mag = Math.hypot(x, y);
+    if (mag < DEADZONE) return [0, 0];
+    // Rescale so output starts at 0 just outside the deadzone
+    const s = Math.min(1, (mag - DEADZONE) / (1 - DEADZONE)) / mag;
+    x *= s; y *= s;
+    let l = y + x * TURN_GAIN;
+    let r = y - x * TURN_GAIN;
+    const m = Math.max(1, Math.abs(l), Math.abs(r));
+    l /= m; r /= m;
+    return [Math.round(l * maxSpeed), Math.round(r * maxSpeed)];
+  }
+
+  function currentInput() {
+    const base = Number($('speed').value);
+    if (touch.active) return mix(touch.x, touch.y, base);
+    if (pad.active) return mix(pad.x, pad.y, base + (MAX_WHEEL - base) * pad.boost);
+    return [0, 0];
+  }
+
+  setInterval(() => {
+    const [l, r] = driveOn ? currentInput() : [0, 0];
+    renderWheels(l, r);
+    if (l !== 0 || r !== 0) {
+      publish(TOPIC_DRIVE, l + ',' + r);
+      stopRepeats = 3;
+    } else if (stopRepeats > 0) {
+      // Send the stop a few times in case one is dropped
+      publish(TOPIC_DRIVE, '0,0');
+      stopRepeats--;
+    }
+  }, SEND_MS);
+
+  function emergencyStop() {
+    touch = { x: 0, y: 0, active: false };
+    if (driveOn) { publish(TOPIC_DRIVE, '0,0'); stopRepeats = 3; }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) emergencyStop(); });
+  window.addEventListener('pagehide', emergencyStop);
+  window.addEventListener('blur', emergencyStop);
+
+  // ---------- Touch joystick ----------
+  const padEl = $('pad'), knob = $('knob');
+  let pointerId = null;
+  function moveKnob(clientX, clientY) {
+    const rect = padEl.getBoundingClientRect();
+    const radius = rect.width / 2;
+    let dx = clientX - (rect.left + radius);
+    let dy = clientY - (rect.top + radius);
+    const max = radius - knob.offsetWidth / 2;
+    const d = Math.hypot(dx, dy);
+    if (d > max) { dx *= max / d; dy *= max / d; }
+    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    touch.x = dx / max;
+    touch.y = -dy / max;
+  }
+  padEl.addEventListener('pointerdown', (e) => {
+    if (!driveOn) { toast('Turn on Drive first'); return; }
+    pointerId = e.pointerId;
+    padEl.setPointerCapture(pointerId);
+    knob.classList.add('live');
+    touch.active = true;
+    moveKnob(e.clientX, e.clientY);
+  });
+  padEl.addEventListener('pointermove', (e) => { if (e.pointerId === pointerId) moveKnob(e.clientX, e.clientY); });
+  function release(e) {
+    if (e.pointerId !== pointerId) return;
+    pointerId = null;
+    knob.classList.remove('live');
+    knob.style.transform = 'translate(-50%, -50%)';
+    touch = { x: 0, y: 0, active: false };
+  }
+  padEl.addEventListener('pointerup', release);
+  padEl.addEventListener('pointercancel', release);
+  padEl.addEventListener('lostpointercapture', release);
+
+  // ---------- Gamepad (standard mapping) ----------
+  // A=0 clean, B=1 dock, X=2 next song, Y=3 vacuum, RT=7 boost, Back=8 halt, Start=9 drive toggle
+  const GP = { A: 0, B: 1, X: 2, Y: 3, RT: 7, BACK: 8, START: 9 };
+  function pollGamepad() {
+    const gp = [...(navigator.getGamepads ? navigator.getGamepads() : [])].find(Boolean);
+    if (!gp) {
+      if (pad.active) { pad.active = false; pad.x = pad.y = 0; }
+      requestAnimationFrame(pollGamepad);
+      return;
+    }
+    const x = gp.axes[0] || 0, y = -(gp.axes[1] || 0);
+    pad.x = x; pad.y = y;
+    pad.boost = gp.buttons[GP.RT] ? gp.buttons[GP.RT].value : 0;
+    pad.active = Math.hypot(x, y) >= DEADZONE;
+
+    const pressed = gp.buttons.map((b) => b.pressed);
+    const edge = (i) => pressed[i] && !pad.prev[i];
+    if (edge(GP.START)) toggleDrive();
+    if (edge(GP.A)) command('start');
+    if (edge(GP.B)) command('stop');
+    if (edge(GP.X)) { command(SONGS[songIndex]); songIndex = (songIndex + 1) % SONGS.length; }
+    if (edge(GP.Y)) toggleVacuum();
+    if (edge(GP.BACK)) command('halt');
+    pad.prev = pressed;
+    requestAnimationFrame(pollGamepad);
+  }
+  window.addEventListener('gamepadconnected', (e) => {
+    $('gp').innerHTML = 'Controller: <b></b><br>Stick drives · RT boost · Start drive · A clean · B dock · X song · Y vacuum · Back halt';
+    $('gp').querySelector('b').textContent = e.gamepad.id.replace(/\s*\(.*\)\s*/, '') || 'Gamepad';
+    toast('Controller connected');
+  });
+  window.addEventListener('gamepaddisconnected', () => {
+    pad = { x: 0, y: 0, boost: 0, active: false, prev: [] };
+    $('gp').textContent = 'Controller disconnected.';
+    emergencyStop();
+  });
+  requestAnimationFrame(pollGamepad);
+
+  // ---------- Buttons ----------
+  function toggleDrive() {
+    if (!connected) { toast('Not connected'); return; }
+    command(driveOn ? 'drive_off' : 'drive_on');
+    if (!driveOn) toast('Waking Roomba…');
+  }
+  function toggleVacuum() {
+    if (!driveOn) { toast('Turn on Drive first'); return; }
+    vacuumOn = !vacuumOn;
+    command(vacuumOn ? 'vacuum_on' : 'vacuum_off');
+    renderDrive();
+  }
+  $('driveToggle').addEventListener('click', toggleDrive);
+  $('vacuum').addEventListener('click', toggleVacuum);
+  document.querySelectorAll('[data-cmd]').forEach((b) => b.addEventListener('click', () => command(b.dataset.cmd)));
+
+  const speed = $('speed');
+  speed.value = store.get('speed', '250');
+  const showSpeed = () => { $('speedOut').textContent = speed.value + ' mm/s'; store.set('speed', speed.value); };
+  speed.addEventListener('input', showSpeed); showSpeed();
+
+  // ---------- Settings ----------
+  $('openSettings').addEventListener('click', () => {
+    $('url').value = store.get('url', defaultUrl());
+    $('user').value = store.get('user', '');
+    $('pass').value = store.get('pass', '');
+    $('settings').showModal();
+  });
+  $('settings').addEventListener('close', () => {
+    if ($('settings').returnValue !== 'save') return;
+    store.set('url', $('url').value.trim() || defaultUrl());
+    store.set('user', $('user').value.trim());
+    store.set('pass', $('pass').value);
+    connect();
+  });
+
+  renderDrive();
+  connect();
+})();
+</script>
+</body>
+</html>
