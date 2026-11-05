@@ -14,6 +14,7 @@ The Roomba-MQTT integration is a project that allows you to add Wi-Fi connectivi
 - **MQTT Control:** Control your Roomba via MQTT messages.
 - **Home Assistant Integration:** Seamlessly integrate your Roomba with Home Assistant.
 - **Remote Control:** Drive the Roomba like an RC car from a phone, a gamepad, or a Home Assistant dashboard. See [Remote Control](#remote-control).
+- **Floor-plan positioning:** Wheel odometry from the Roomba's sensor stream, matched to a floor plan you scan with a LiDAR iPhone, shows which room the robot is in and where on the map. See [docs/MAPPING.md](docs/MAPPING.md), which also explains how modern Roombas map.
 
 ## Prerequisites
 
@@ -64,6 +65,7 @@ These commands are what are publishable to the MQTT server roomba/commands topic
 | Drive Off | `drive_off` | Stops the wheels and cleaning motors and leaves drive mode |
 | Vacuum On | `vacuum_on` | Turns on the vacuum and brushes while in drive mode |
 | Vacuum Off | `vacuum_off` | Turns off the vacuum and brushes while in drive mode |
+| Reset Odometry | `odom_reset` | Zeroes the odometry pose published on `roomba/odom` |
 
 #### MQTT Topics
 
@@ -76,6 +78,10 @@ These commands are what are publishable to the MQTT server roomba/commands topic
 | `roomba/charging` | Publishes                | Status code for charging                                                   | - 0 Not Charging<br> - 1 Charging Recovery<br> - 2 Charging<br> - 3 Trickle Charging<br> - 4 Waiting<br> - 5 Charging Error |
 | `roomba/drive`    | Subscribes               | Wheel speeds while in drive mode (OI Drive Direct). Ignored when drive mode is off | `<left>,<right>` in mm/s, -500 to 500 (e.g. `200,200` forward, `150,-150` spin right) |
 | `roomba/drive/state` | Publishes             | Whether drive mode is on                                                   | - on<br> - off                                                                                                              |
+| `roomba/odom`     | Publishes                | Wheel odometry and sensors, 5 times a second while moving                  | JSON `{"x","y","th","b","lb","ls","vl","vr"}` (see [docs/MAPPING.md](docs/MAPPING.md#mqtt-topics))                           |
+| `roomba/bump`     | Publishes                | A bumper or wheel drop was pressed                                         | JSON `{"x","y","th","b","lb"}`                                                                                              |
+
+The mapper service adds `roomba/pose`, `roomba/room`, `roomba/map/plan`, `roomba/map/obstacles` and `roomba/map/cmd`; see [docs/MAPPING.md](docs/MAPPING.md#mqtt-topics).
 
 ## Installation
 
@@ -486,6 +492,39 @@ aspect_ratio: 180%
 ```
 
 URL-encode the password if it contains `&`, `#`, or `+`.
+
+## Floor-Plan Positioning
+
+The firmware streams the Roomba's sensors (OI opcode 148) and publishes wheel odometry and bumps. The [mapper](mapper/) service matches them to a floor plan scanned with a LiDAR iPhone (RoomPlan) using a particle filter, and publishes the robot's position and current room. The web remote then shows the robot live on your floor plan. Read [docs/MAPPING.md](docs/MAPPING.md) for how it works and the full setup.
+
+Run the mapper with Docker Compose:
+
+```
+  roomba-mapper:
+    container_name: roomba-mapper
+    build: /path/to/Roomba-MQTT-Integration/mapper
+    restart: unless-stopped
+    volumes:
+      - /opt/.roomba-mapper:/data      # plan.json, plan.svg preview, obstacles.json
+    environment:
+      MQTT_HOST: mqtt
+      MQTT_USER: roomba_web
+      MQTT_PASS: <password>
+    networks:
+      - home-assistant-network
+```
+
+Import a scan: `docker exec roomba-mapper python import_plan.py /data/scan.usdz -o /data/plan.json`. Tests: `cd mapper && python3 -m unittest -v test_mapper`.
+
+Home Assistant sensor for the current room:
+
+```
+  - sensor:
+      - unique_id: roomba_sensor_room
+        name: "Roomba Room"
+        state_topic: "roomba/room"
+        icon: mdi:floor-plan
+```
 
 ## Examples
 
