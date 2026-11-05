@@ -257,8 +257,32 @@
   /* Steering vector drawn like a dimension line from the robot to the thumb */
   .vector { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: visible; }
   .vector[hidden] { display: none; }
-  .vector line { stroke: var(--ink); stroke-width: 1.5; }
-  .vector .tick { stroke-width: 2; }
+  .stick-base { fill: var(--orange-wash); stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .stick-arm { stroke: var(--ink); stroke-width: 1.5; }
+  .stick-knob { fill: var(--orange); stroke: var(--robot-line); stroke-width: 2; }
+  .vector.idle .stick-base { opacity: .55; }
+  .vector.idle text, .vector.idle .stick-arm { display: none; }
+
+  /* Plan / Drive view switch, like sheet tabs on a drawing set */
+  .views { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 4; display: flex; }
+  .views[hidden] { display: none; }
+  .view-tab {
+    height: 30px; padding: 1px 14px 0; border: var(--rule) solid var(--ink); background: var(--paper-hi);
+    font-weight: 700; font-size: 12px; letter-spacing: .09em; text-transform: uppercase;
+  }
+  .view-tab + .view-tab { border-left: 0; }
+  .view-tab[aria-pressed="true"] { background: var(--ink); color: var(--paper-hi); }
+
+  /* Calibration panel */
+  .calib { border: var(--rule) solid var(--ink); background: var(--paper-hi); padding: 10px 12px 12px; display: grid; gap: 8px; }
+  .calib[hidden] { display: none; }
+  .calib h2 { margin: 0; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
+  .calib h2 button { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+  .calib p { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+  .calib .reading { font-size: 22px; font-weight: 800; }
+  .calib .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .calib .row .tag { flex: 1; min-height: 44px; }
+  .calib input { width: 110px; padding: 9px 10px 7px; border: var(--rule) solid var(--ink); border-radius: 0; background: var(--paper); color: var(--ink); font: 700 15px var(--font); user-select: text; }
   .vector text { fill: var(--ink); font: 700 12px var(--font); letter-spacing: .04em; paint-order: stroke; stroke: var(--paper); stroke-width: 4px; }
 
   .room-note {
@@ -442,11 +466,15 @@
         </svg>
       </div>
       <svg class="vector" id="vector" hidden>
-        <line id="vLine"/>
-        <line class="tick" id="vTickA"/>
-        <line class="tick" id="vTickB"/>
+        <circle class="stick-base" id="jBase" r="60"/>
+        <line class="stick-arm" id="jArm"/>
+        <circle class="stick-knob" id="jKnob" r="24"/>
         <text id="vText" text-anchor="middle"></text>
       </svg>
+      <div class="views" id="views" hidden>
+        <button class="view-tab" data-view="plan" aria-pressed="true">Plan</button>
+        <button class="view-tab" data-view="drive" aria-pressed="false">Drive</button>
+      </div>
       <span class="room-note" id="roomNote">Open the door to drive</span>
     </div>
     <div class="door">
@@ -469,8 +497,29 @@
     </div>
 
     <section class="tags maptools" id="maptools" aria-label="Map" hidden>
-      <button class="tag wide" id="setDock" aria-pressed="false"><b>Set dock</b><small>then tap the plan</small></button>
-      <button class="tag wide" id="relocate"><b>Relocate</b><small>if the position looks wrong</small></button>
+      <button class="tag" id="setDock" aria-pressed="false"><b>Dock</b><small>tap, drag to aim</small></button>
+      <button class="tag" id="relocate"><b>Relocate</b><small>if lost</small></button>
+      <button class="tag wide" id="openCalib"><b>Calibrate</b><small>measure wheel slip</small></button>
+    </section>
+
+    <section class="calib" id="calib" aria-label="Calibrate" hidden>
+      <h2>Calibrate <button id="closeCalib">Close</button></h2>
+      <div id="calibPick">
+        <p>Wheels slip, so the encoders over-count. Measure it once per floor type. Turn Drive on first.</p>
+        <div class="row" style="margin-top:8px">
+          <button class="tag" id="calibTurn"><b>Spin test</b><small>2 full turns</small></button>
+          <button class="tag" id="calibDist"><b>Distance test</b><small>drive and measure</small></button>
+        </div>
+      </div>
+      <div id="calibRunning" hidden>
+        <p id="calibHelp"></p>
+        <div class="reading" id="calibReading">0</div>
+        <div class="row">
+          <label id="calibRealWrap" hidden>Real distance <input id="calibReal" type="number" inputmode="decimal" min="10" placeholder="cm"> cm</label>
+          <button class="tag" id="calibDone"><b>Done</b><small>save</small></button>
+          <button class="tag" id="calibCancel"><b>Cancel</b></button>
+        </div>
+      </div>
     </section>
 
     <section class="tags" aria-label="Cleaning">
@@ -646,7 +695,7 @@
     client.on('connect', () => {
       connected = true; setConn('ok', 'Live');
       client.subscribe(['roomba/status', 'roomba/battery', 'roomba/drive/state',
-        'roomba/odom', 'roomba/pose', 'roomba/map/plan', 'roomba/map/obstacles']);
+        'roomba/odom', 'roomba/pose', 'roomba/map/plan', 'roomba/map/obstacles', 'roomba/map/calibration']);
     });
     client.on('reconnect', () => { setConn('wait', 'Retrying'); $('connText').title = 'Reconnecting to ' + url; });
     client.on('close', () => {
@@ -668,6 +717,7 @@
         waking = false;
         if (!driveOn) vacuumOn = false;
         renderDrive();
+        restStick();
       } else if (topic === 'roomba/odom') {
         try { onOdom(JSON.parse(msg)); } catch {}
       } else if (topic === 'roomba/pose') {
@@ -676,6 +726,8 @@
         try { onPlan(JSON.parse(msg)); } catch {}
       } else if (topic === 'roomba/map/obstacles') {
         try { obstacles = JSON.parse(msg); } catch {}
+      } else if (topic === 'roomba/map/calibration') {
+        try { const c = JSON.parse(msg); calib = { dist: c.dist_scale, turn: c.turn_scale }; } catch {}
       }
     });
   }
@@ -748,6 +800,12 @@
   let planData = null, view = null, obstacles = [];
   let mapPose = null, mapPoseAt = 0, odomAt = 0;
   let settingDock = false;
+  let dockDraft = null;          // {x, y, th} while placing the dock: tap to place, drag to aim
+  let userView = 'plan';         // 'plan' or 'drive', chosen with the view tabs
+  try { userView = localStorage.getItem('roomba.view') || 'plan'; } catch {}
+  let calib = { dist: 0.70, turn: 0.66 };
+  let rawOdom = null;            // last raw odometry message, for deltas
+  let calibRun = null;           // {kind: 'turn'|'dist', turn: rad, dist: mm} while a calibration test runs
 
   function sizeCanvas() {
     const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
@@ -759,9 +817,21 @@
 
   function onOdom(o) {
     odomAt = Date.now();
-    if (mode !== 'odom') return;
-    // Odometry frame: x forward, y left, theta counter-clockwise. Screen: forward = up.
-    pose = { x: -o.y, y: -o.x, h: -o.th };
+    const prev = rawOdom; rawOdom = o;
+    if (!prev) return;
+    // Step since the last message, in the robot's own frame
+    const dx = o.x - prev.x, dy = o.y - prev.y;
+    if (Math.hypot(dx, dy) > 1500) return;  // ESP restart or odom_reset
+    let dist = dx * Math.cos(prev.th) + dy * Math.sin(prev.th);
+    let turn = ((o.th - prev.th + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
+    if (calibRun) { calibRun.dist += dist; calibRun.turn += turn; renderCalib(); }
+    if (mode !== 'odom' || (o.b & 0x0C)) return;   // Lifted: spinning wheels don't move the robot
+    if ((o.b & 0x03) && dist > 0) dist = 0;          // Pushing into something: wheels slip
+    // Follow view in screen mm (forward = up), corrected for wheel slip
+    dist *= calib.dist; turn *= calib.turn;
+    pose.h -= turn;
+    pose.x += Math.sin(pose.h) * dist;
+    pose.y -= Math.cos(pose.h) * dist;
     addPoint(pose.x, pose.y);
   }
   function onPose(p) {
@@ -799,7 +869,9 @@
 
   function currentMode() {
     const now = Date.now();
-    if (view && mapPose && now - mapPoseAt < STALE_MS) return 'plan';
+    const planReady = view && mapPose && now - mapPoseAt < STALE_MS;
+    $('views').hidden = !planReady;
+    if (planReady && userView === 'plan') return 'plan';
     if (now - odomAt < STALE_MS) return 'odom';
     return 'estimate';
   }
@@ -808,6 +880,8 @@
     pose = { x: 0, y: 0, h: 0 };
     $('room').classList.toggle('plan', m === 'plan');
     $('maptools').hidden = m !== 'plan';
+    document.querySelectorAll('.view-tab').forEach((t) => t.setAttribute('aria-pressed', String(t.dataset.view === userView)));
+    restStick();
     if (m !== 'plan') { robot.style.left = robot.style.top = robot.style.width = robot.style.opacity = ''; floor.style.backgroundSize = ''; settingDock = false; }
     $('trailNote').textContent = {
       plan: 'Position comes from the mapper: wheel encoders matched to your floor plan using bumps.',
@@ -818,8 +892,12 @@
   }
   function renderRoomLabel() {
     const label = document.querySelector('.room-label');
-    if (settingDock) { label.textContent = 'Tap where the dock is'; return; }
-    if (mode !== 'plan' || !mapPose) { label.textContent = 'Floor plan'; return; }
+    if (settingDock) { label.textContent = dockDraft ? 'Drag to aim, lift to save' : 'Tap where the dock is'; return; }
+    if (mode !== 'plan') {
+      label.textContent = mapPose && mapPose.conf === 'good' && mapPose.room ? mapPose.room : mode === 'odom' ? 'Drive' : 'Floor plan';
+      return;
+    }
+    if (!mapPose) { label.textContent = 'Floor plan'; return; }
     label.textContent = mapPose.conf === 'lost' ? 'Position lost'
       : (mapPose.room || 'Floor plan') + (mapPose.conf === 'rough' ? ' · finding position' : '');
   }
@@ -858,13 +936,19 @@
       const cx = r.polygon.reduce((a, p) => a + p[0], 0) / n, cy = r.polygon.reduce((a, p) => a + p[1], 0) / n;
       ctx.fillText(r.name.toUpperCase(), sx(cx), sy(cy));
     }
-    const d = planData.dock;
-    if (d) {
-      const t = (d.theta_deg || 90) * Math.PI / 180, x = sx(d.x), y = sy(d.y), s = Math.max(10, 340 * k) / 2;
-      ctx.save(); ctx.translate(x, y); ctx.rotate(-t);
-      ctx.strokeStyle = c.ink; ctx.lineWidth = 1.5; ctx.strokeRect(-s - 6, -s, 6, 2 * s);   // dock plate against the wall
+    const drawDock = (dx, dy, th, color, draft) => {
+      // The robot docks head-first, so the dock plate sits in front of it, against the wall
+      const x = sx(dx), y = sy(dy), s = Math.max(10, 340 * k) / 2;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(-th);
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 1.5;
+      ctx.strokeRect(s + 2, -s, 7, 2 * s);
+      ctx.beginPath(); ctx.arc(0, 0, s, 0, Math.PI * 2); ctx.setLineDash(draft ? [4, 3] : [2, 3]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(s - 2, 0); ctx.lineTo(s - 10, -5); ctx.lineTo(s - 10, 5); ctx.closePath(); ctx.fill();
       ctx.restore();
-    }
+    };
+    const d = planData.dock;
+    if (d && !dockDraft) drawDock(d.x, d.y, (d.theta_deg || 0) * Math.PI / 180, c.ink, false);
+    if (dockDraft) drawDock(dockDraft.x, dockDraft.y, dockDraft.th, c.orange, true);
     ctx.fillStyle = c.orange;
     for (const [x, y] of obstacles) { ctx.beginPath(); ctx.arc(sx(x), sy(y), 2.5, 0, Math.PI * 2); ctx.fill(); }
   }
@@ -929,39 +1013,43 @@
   function steer(clientX, clientY) {
     const rect = room.getBoundingClientRect();
     const cx = origin ? origin.x : rect.left + rect.width / 2, cy = origin ? origin.y : rect.top + rect.height / 2;
-    const max = rect.width * 0.38;
+    const max = rect.width * (origin ? 0.26 : 0.38);   // Floating stick in the plan view is smaller
     let dx = clientX - cx, dy = clientY - cy;
     const d = Math.hypot(dx, dy);
     if (d > max) { dx *= max / d; dy *= max / d; }
     touch.x = dx / max; touch.y = -dy / max;
     const w = cx - rect.left - room.clientLeft, h = cy - rect.top - room.clientTop;
-    vec.removeAttribute('hidden');
-    const shellR = origin ? 0 : rect.width * 0.22 * 0.46 + 6;
-    const dist = Math.hypot(dx, dy);
-    vec.style.visibility = dist > shellR + 8 ? 'visible' : 'hidden';
-    const sx = w + dx / (dist || 1) * shellR, sy = h + dy / (dist || 1) * shellR;
-    $('vLine').setAttribute('x1', sx); $('vLine').setAttribute('y1', sy);
-    $('vLine').setAttribute('x2', w + dx); $('vLine').setAttribute('y2', h + dy);
-    // End ticks perpendicular to the line, like a plan dimension
-    const len = Math.hypot(dx, dy) || 1, px = -dy / len * 9, py = dx / len * 9;
-    for (const [id, x, y] of [['vTickA', sx, sy], ['vTickB', w + dx, h + dy]]) {
-      const t = $(id);
-      t.setAttribute('x1', x - px); t.setAttribute('y1', y - py);
-      t.setAttribute('x2', x + px); t.setAttribute('y2', y + py);
-    }
+    drawStick(w, h, w + dx, h + dy, max);
     const [l, r] = mix(touch.x, touch.y, Number($('speed').value));
-    const label = $('vText');
-    label.textContent = Math.abs(Math.round((l + r) / 2)) + ' mm/s';
-    label.style.display = dist - shellR > 70 ? '' : 'none';
-    label.setAttribute('x', (sx + w + dx) / 2 + px * 2.2); label.setAttribute('y', (sy + h + dy) / 2 + py * 2.2 + 4);
+    $('vText').textContent = Math.abs(Math.round((l + r) / 2)) + ' mm/s';
+    $('vText').setAttribute('x', w); $('vText').setAttribute('y', h - max - 10);
+  }
+  // Joystick: dashed base ring at the origin, knob under the thumb
+  function drawStick(bx, by, kx, ky, radius, idle = false) {
+    vec.removeAttribute('hidden');
+    vec.classList.toggle('idle', idle);
+    $('jBase').setAttribute('cx', bx); $('jBase').setAttribute('cy', by); $('jBase').setAttribute('r', radius);
+    $('jKnob').setAttribute('cx', kx); $('jKnob').setAttribute('cy', ky);
+    $('jKnob').setAttribute('r', Math.max(16, radius * 0.28));
+    $('jArm').setAttribute('x1', bx); $('jArm').setAttribute('y1', by);
+    $('jArm').setAttribute('x2', kx); $('jArm').setAttribute('y2', ky);
+  }
+  // In the Drive view, show the resting stick around the robot whenever driving is on
+  function restStick() {
+    if (touch.active) return;
+    if (driveOn && mode !== 'plan') {
+      const w = room.clientWidth / 2, h = room.clientHeight / 2, r = room.getBoundingClientRect().width * 0.38;
+      drawStick(w, h, w, h, r, true);
+    } else {
+      vec.setAttribute('hidden', '');
+    }
   }
   room.addEventListener('pointerdown', (e) => {
     if (settingDock && view) {
-      const rect = room.getBoundingClientRect();
-      const x = (e.clientX - rect.left - room.clientLeft - view.ox) / view.k;
-      const y = (view.oy - (e.clientY - rect.top - room.clientTop)) / view.k;
-      if (publish('roomba/map/cmd', JSON.stringify({ cmd: 'set_dock', x: Math.round(x), y: Math.round(y) }))) toast('Dock placed');
-      settingDock = false; $('setDock').setAttribute('aria-pressed', 'false'); renderRoomLabel();
+      const [x, y] = toPlan(e);
+      dockDraft = { x, y, th: nearestWallHeading(x, y) };
+      pointerId = e.pointerId; room.setPointerCapture(pointerId);
+      renderRoomLabel();
       return;
     }
     if (!driveOn) { toast(connected ? 'Open the door first' : 'Not connected'); return; }
@@ -972,15 +1060,55 @@
     $('roomNote').hidden = true;
     steer(e.clientX, e.clientY);
   });
-  room.addEventListener('pointermove', (e) => { if (e.pointerId === pointerId) steer(e.clientX, e.clientY); });
+  room.addEventListener('pointermove', (e) => {
+    if (e.pointerId !== pointerId) return;
+    if (dockDraft) {
+      // Aim: the robot faces from the dock spot toward the finger, snapped to 15 degrees
+      const [x, y] = toPlan(e);
+      if (Math.hypot(x - dockDraft.x, y - dockDraft.y) > 150) {
+        const step = Math.PI / 12;
+        dockDraft.th = Math.round(Math.atan2(y - dockDraft.y, x - dockDraft.x) / step) * step;
+      }
+      return;
+    }
+    steer(e.clientX, e.clientY);
+  });
+  function toPlan(e) {
+    const rect = room.getBoundingClientRect();
+    return [(e.clientX - rect.left - room.clientLeft - view.ox) / view.k,
+            (view.oy - (e.clientY - rect.top - room.clientTop)) / view.k];
+  }
+  // Heading toward the nearest wall, snapped to the plan's axes (walls are axis-aligned after import)
+  function nearestWallHeading(x, y) {
+    let best = Infinity, heading = 0;
+    for (const [ax, ay, bx, by] of planData.walls) {
+      const vx = bx - ax, vy = by - ay, len2 = vx * vx + vy * vy || 1;
+      const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / len2));
+      const px = ax + t * vx - x, py = ay + t * vy - y, d = Math.hypot(px, py);
+      if (d < best) { best = d; heading = Math.atan2(py, px); }
+    }
+    return Math.round(heading / (Math.PI / 2)) * (Math.PI / 2);
+  }
+  function finishDock() {
+    if (!dockDraft) return;
+    const deg = ((Math.round(dockDraft.th * 180 / Math.PI) % 360) + 360) % 360;
+    if (publish('roomba/map/cmd', JSON.stringify({ cmd: 'set_dock', x: Math.round(dockDraft.x), y: Math.round(dockDraft.y), theta_deg: deg }))) toast('Dock saved');
+    dockDraft = null; settingDock = false; pointerId = null;
+    $('setDock').setAttribute('aria-pressed', 'false'); renderRoomLabel();
+  }
   function releaseTouch() {
     pointerId = null;
     touch = { x: 0, y: 0, active: false };
     vec.setAttribute('hidden', '');
     renderDrive();
+    restStick();
   }
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) {
-    room.addEventListener(ev, (e) => { if (e.pointerId === pointerId) releaseTouch(); });
+    room.addEventListener(ev, (e) => {
+      if (e.pointerId !== pointerId) return;
+      if (dockDraft) { if (ev === 'pointercancel') { dockDraft = null; pointerId = null; renderRoomLabel(); } else finishDock(); return; }
+      releaseTouch();
+    });
   }
 
   // ---------- Gamepad (standard mapping) ----------
@@ -1037,9 +1165,57 @@
   $('driveToggle').addEventListener('click', toggleDrive);
   $('vacuum').addEventListener('click', toggleVacuum);
   $('setDock').addEventListener('click', () => {
-    settingDock = !settingDock;
+    settingDock = !settingDock; dockDraft = null;
     $('setDock').setAttribute('aria-pressed', String(settingDock));
     renderRoomLabel();
+  });
+  // The tabs sit inside the room: keep their taps from starting the joystick
+  $('views').addEventListener('pointerdown', (e) => e.stopPropagation());
+  document.querySelectorAll('.view-tab').forEach((t) => t.addEventListener('click', () => {
+    userView = t.dataset.view;
+    try { localStorage.setItem('roomba.view', userView); } catch {}
+    applyMode(currentMode());
+  }));
+
+  // Calibration: the page sums the raw encoder odometry during a test and compares it with reality
+  function renderCalib() {
+    if (!calibRun) return;
+    $('calibReading').textContent = calibRun.kind === 'turn'
+      ? `Encoders: ${Math.abs(calibRun.turn * 180 / Math.PI).toFixed(0)}°`
+      : `Encoders: ${(Math.abs(calibRun.dist) / 10).toFixed(0)} cm`;
+  }
+  function startCalib(kind) {
+    if (!rawOdom) { toast('No odometry from the robot yet'); return; }
+    calibRun = { kind, turn: 0, dist: 0 };
+    $('calibPick').hidden = true; $('calibRunning').hidden = false;
+    $('calibRealWrap').hidden = kind !== 'dist';
+    $('calibHelp').textContent = kind === 'turn'
+      ? 'Note which way the robot faces. Spin it in place with the stick until it has turned exactly 2 full turns and faces the same way again, then tap Done.'
+      : 'Mark the floor at the front of the robot. Drive straight 1–2 m, stop, measure how far it really went, enter it, then tap Done.';
+    renderCalib();
+  }
+  function endCalib() {
+    calibRun = null; $('calibPick').hidden = false; $('calibRunning').hidden = true; $('calibReal').value = '';
+  }
+  $('openCalib').addEventListener('click', () => { $('calib').hidden = false; endCalib(); });
+  $('closeCalib').addEventListener('click', () => { $('calib').hidden = true; endCalib(); });
+  $('calibTurn').addEventListener('click', () => startCalib('turn'));
+  $('calibDist').addEventListener('click', () => startCalib('dist'));
+  $('calibCancel').addEventListener('click', endCalib);
+  $('calibDone').addEventListener('click', () => {
+    if (!calibRun) return;
+    let msg;
+    if (calibRun.kind === 'turn') {
+      const measured = Math.abs(calibRun.turn);
+      if (measured < Math.PI) { toast('Spin at least 2 turns first'); return; }
+      msg = { cmd: 'set_calibration', turn_scale: +(4 * Math.PI / measured).toFixed(3) };
+    } else {
+      const real = Number($('calibReal').value) * 10, measured = Math.abs(calibRun.dist);
+      if (!(real > 100) || measured < 100) { toast('Drive at least 10 cm and enter the real distance'); return; }
+      msg = { cmd: 'set_calibration', dist_scale: +(real / measured).toFixed(3) };
+    }
+    if (publish('roomba/map/cmd', JSON.stringify(msg))) toast('Calibration saved');
+    endCalib();
   });
   $('relocate').addEventListener('click', (e) => {
     if (publish('roomba/map/cmd', 'relocalize')) { flashTag(e.currentTarget); toast('Finding position'); }
