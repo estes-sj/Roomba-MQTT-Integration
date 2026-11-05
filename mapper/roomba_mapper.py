@@ -32,6 +32,11 @@ DATA_DIR = os.getenv("DATA_DIR", "/data")
 PLAN_PATH = os.getenv("PLAN_PATH", os.path.join(DATA_DIR, "plan.json"))
 PARTICLES = int(os.getenv("PARTICLES", "1500"))
 OBSTACLES_PATH = os.path.join(DATA_DIR, "obstacles.json")
+# Odometry calibration: real movement / what the encoders reported. Wheels slip (most of all when
+# spinning in place on carpet), so encoders over-count. Measured on the den floor 2026-11-05:
+# 1 full spin read as ~543 degrees, ~1 m forward read as ~1.42 m.
+DIST_SCALE = float(os.getenv("ODOM_DIST_SCALE", "0.70"))
+TURN_SCALE = float(os.getenv("ODOM_TURN_SCALE", "0.66"))
 CHARGING_STATES = {"1", "2", "3", "4"}  # Charging recovery, charging, trickle, waiting: on the dock
 
 
@@ -112,8 +117,8 @@ class Mapper:
         if math.hypot(dx, dy) > 1500:
             log.info("odometry jumped (ESP restart or odom_reset); skipping one step")
             return
-        distance = dx * math.cos(pth) + dy * math.sin(pth)   # Signed: negative when reversing
-        turn = wrap(th - pth)
+        distance = (dx * math.cos(pth) + dy * math.sin(pth)) * DIST_SCALE   # Signed: negative when reversing
+        turn = wrap(th - pth) * TURN_SCALE
         if not self.docked:
             self.loc.move(distance, turn)
 

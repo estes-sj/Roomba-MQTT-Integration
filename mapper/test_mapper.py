@@ -170,6 +170,8 @@ class MapperTest(unittest.TestCase):
         tmp = tempfile.mkdtemp()
         os.environ["DATA_DIR"] = tmp
         os.environ["PLAN_PATH"] = os.path.join(tmp, "plan.json")
+        os.environ["ODOM_DIST_SCALE"] = "1"
+        os.environ["ODOM_TURN_SCALE"] = "1"
         planlib.save(TWO_ROOMS, os.environ["PLAN_PATH"])
         import importlib
         import roomba_mapper

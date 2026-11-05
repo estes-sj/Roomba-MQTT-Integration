@@ -66,7 +66,7 @@ class Localizer:
         # Noise per step: wheel slip scales distance a few percent; heading wanders slowly with
         # travel and more with turning (in-place spins slip the most)
         d = distance * (1 + self.rng.normal(0, 0.03, n)) + self.rng.normal(0, 1.0, n)
-        t = turn * (1 + self.rng.normal(0, 0.08, n)) + self.rng.normal(0, 0.0005 + 0.00008 * abs(distance), n)
+        t = turn * (1 + self.rng.normal(0, 0.15, n)) + self.rng.normal(0, 0.0005 + 0.00008 * abs(distance), n)
         mid = self.th + t / 2
         self.x += d * np.cos(mid)
         self.y += d * np.sin(mid)

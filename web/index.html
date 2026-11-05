@@ -765,8 +765,11 @@
     addPoint(pose.x, pose.y);
   }
   function onPose(p) {
+    // While the mapper is still searching its estimate can jump across the room: only draw the
+    // trail once it is confident, and start a fresh trail when it becomes confident
+    if (p.conf === 'good' && mapPose && mapPose.conf !== 'good') points = [];
     mapPose = p; mapPoseAt = Date.now();
-    if (mode === 'plan') addPoint(p.x, p.y);
+    if (mode === 'plan' && p.conf === 'good') addPoint(p.x, p.y);
     renderRoomLabel();
   }
   function onPlan(p) {
@@ -805,7 +808,7 @@
     pose = { x: 0, y: 0, h: 0 };
     $('room').classList.toggle('plan', m === 'plan');
     $('maptools').hidden = m !== 'plan';
-    if (m !== 'plan') { robot.style.left = robot.style.top = robot.style.width = ''; floor.style.backgroundSize = ''; settingDock = false; }
+    if (m !== 'plan') { robot.style.left = robot.style.top = robot.style.width = robot.style.opacity = ''; floor.style.backgroundSize = ''; settingDock = false; }
     $('trailNote').textContent = {
       plan: 'Position comes from the mapper: wheel encoders matched to your floor plan using bumps.',
       odom: 'The trail comes from the wheel encoders. Without a floor plan it slowly drifts.',
@@ -885,6 +888,7 @@
       robot.style.left = (sx(mapPose.x) + room.clientLeft) + 'px';
       robot.style.top = (sy(mapPose.y) + room.clientTop) + 'px';
       robot.style.setProperty('--heading', (Math.PI / 2 - mapPose.th) + 'rad');
+      robot.style.opacity = mapPose.conf === 'good' ? '' : '0.45';
       toScreen = (p) => [sx(p.x), sy(p.y)];
       trailMs = 120000; trailWidth = Math.max(4, 300 * k);
     } else {
