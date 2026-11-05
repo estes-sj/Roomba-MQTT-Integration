@@ -23,6 +23,8 @@
 //            Added over-the-air (OTA) updates via ArduinoOTA
 //            Sensors now come from the OI sensor stream (opcode 148) instead of polling. Adds wheel
 //            odometry on roomba/odom and bump events on roomba/bump for the mapper service
+//            Keep the last known battery values while the Roomba sleeps (NO DATA only when it was
+//            never heard from), and ignore seek-dock while already charging on the dock
 
 #include <PubSubClient.h>
 #include <ESP8266WiFi.h>
@@ -340,6 +342,14 @@ void startSpotCleaning()
 void stopCleaning()
 {
   leaveDriveMode();
+  // Already charging on the dock: seek-dock would switch to Safe mode (which stops charging)
+  // and beep, so just report the status
+  if (streamFresh() && sensors.charging >= 1 && sensors.charging <= 4)
+  {
+    lastStatus = "Docked";
+    client.publish("roomba/status", lastStatus);
+    return;
+  }
   Serial.write(128);
   delay(50);
   Serial.write(131);
@@ -1181,8 +1191,11 @@ void sendInfoRoomba() {
     }
     startSensorStream();
   }
-  if (!streamFresh())
+  if (!sensors.valid)
   {
+    // Never heard from the Roomba since boot: the serial cable is probably disconnected.
+    // (A sleeping Roomba also stops streaming, but then the last known values below are kept,
+    // as the polling firmware did. Home Assistant treats NO DATA as a disconnect alert.)
     client.publish("roomba/battery", "NO DATA");
     return;
   }
