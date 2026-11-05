@@ -1,0 +1,550 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-05T15:25:44+00:00",
+  "title": "Design System: Roomba Remote",
+  "extensions": {
+    "colorMeta": {
+      "plan-ink": {
+        "role": "primary",
+        "displayName": "Plan Ink",
+        "canonical": "#142a45",
+        "oklch": "oklch(28.2% 0.057 254.6)",
+        "tonalRamp": [
+          "oklch(15% 0.057 254.6)",
+          "oklch(26% 0.057 254.6)",
+          "oklch(38% 0.057 254.6)",
+          "oklch(49% 0.057 254.6)",
+          "oklch(61% 0.057 254.6)",
+          "oklch(72% 0.057 254.6)",
+          "oklch(84% 0.057 254.6)",
+          "oklch(95% 0.057 254.6)"
+        ],
+        "cssVar": "--ink"
+      },
+      "safety-orange": {
+        "role": "secondary",
+        "displayName": "Safety Orange",
+        "canonical": "#ff5a1f",
+        "oklch": "oklch(68.2% 0.211 37.7)",
+        "tonalRamp": [
+          "oklch(15% 0.211 37.7)",
+          "oklch(26% 0.211 37.7)",
+          "oklch(38% 0.211 37.7)",
+          "oklch(49% 0.211 37.7)",
+          "oklch(61% 0.211 37.7)",
+          "oklch(72% 0.211 37.7)",
+          "oklch(84% 0.211 37.7)",
+          "oklch(95% 0.211 37.7)"
+        ],
+        "cssVar": "--orange"
+      },
+      "mint-paper": {
+        "role": "neutral",
+        "displayName": "Mint Drafting Paper",
+        "canonical": "#e4eee8",
+        "oklch": "oklch(94.0% 0.013 159.9)",
+        "tonalRamp": [
+          "oklch(15% 0.013 159.9)",
+          "oklch(26% 0.013 159.9)",
+          "oklch(38% 0.013 159.9)",
+          "oklch(49% 0.013 159.9)",
+          "oklch(61% 0.013 159.9)",
+          "oklch(72% 0.013 159.9)",
+          "oklch(84% 0.013 159.9)",
+          "oklch(95% 0.013 159.9)"
+        ],
+        "cssVar": "--paper"
+      },
+      "paper-highlight": {
+        "role": "neutral",
+        "displayName": "Paper Highlight",
+        "canonical": "#f2f7f4",
+        "oklch": "oklch(97.2% 0.007 160.1)",
+        "tonalRamp": [
+          "oklch(15% 0.007 160.1)",
+          "oklch(26% 0.007 160.1)",
+          "oklch(38% 0.007 160.1)",
+          "oklch(49% 0.007 160.1)",
+          "oklch(61% 0.007 160.1)",
+          "oklch(72% 0.007 160.1)",
+          "oklch(84% 0.007 160.1)",
+          "oklch(95% 0.007 160.1)"
+        ],
+        "cssVar": "--paper-hi"
+      },
+      "ink-secondary": {
+        "role": "neutral",
+        "displayName": "Secondary Ink",
+        "canonical": "#4b6280",
+        "oklch": "oklch(49.0% 0.056 255.3)",
+        "tonalRamp": [
+          "oklch(15% 0.056 255.3)",
+          "oklch(26% 0.056 255.3)",
+          "oklch(38% 0.056 255.3)",
+          "oklch(49% 0.056 255.3)",
+          "oklch(61% 0.056 255.3)",
+          "oklch(72% 0.056 255.3)",
+          "oklch(84% 0.056 255.3)",
+          "oklch(95% 0.056 255.3)"
+        ],
+        "cssVar": "--ink-2"
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Faint Ink (marks only)",
+        "canonical": "#8597ab",
+        "oklch": "oklch(66.9% 0.036 251.1)",
+        "tonalRamp": [
+          "oklch(15% 0.036 251.1)",
+          "oklch(26% 0.036 251.1)",
+          "oklch(38% 0.036 251.1)",
+          "oklch(49% 0.036 251.1)",
+          "oklch(61% 0.036 251.1)",
+          "oklch(72% 0.036 251.1)",
+          "oklch(84% 0.036 251.1)",
+          "oklch(95% 0.036 251.1)"
+        ],
+        "cssVar": "--ink-3"
+      },
+      "on-orange": {
+        "role": "neutral",
+        "displayName": "Burnt Umber (text on orange)",
+        "canonical": "#1b0b02",
+        "oklch": "oklch(17.1% 0.035 55.7)",
+        "tonalRamp": [
+          "oklch(15% 0.035 55.7)",
+          "oklch(26% 0.035 55.7)",
+          "oklch(38% 0.035 55.7)",
+          "oklch(49% 0.035 55.7)",
+          "oklch(61% 0.035 55.7)",
+          "oklch(72% 0.035 55.7)",
+          "oklch(84% 0.035 55.7)",
+          "oklch(95% 0.035 55.7)"
+        ],
+        "cssVar": "--on-orange"
+      },
+      "blueprint-paper": {
+        "role": "neutral",
+        "displayName": "Blueprint Navy",
+        "canonical": "#16467f",
+        "oklch": "oklch(39.5% 0.109 255.2)",
+        "tonalRamp": [
+          "oklch(15% 0.109 255.2)",
+          "oklch(26% 0.109 255.2)",
+          "oklch(38% 0.109 255.2)",
+          "oklch(49% 0.109 255.2)",
+          "oklch(61% 0.109 255.2)",
+          "oklch(72% 0.109 255.2)",
+          "oklch(84% 0.109 255.2)",
+          "oklch(95% 0.109 255.2)"
+        ],
+        "cssVar": "--paper (prefers-color-scheme: dark / data-theme=\"dark\")"
+      },
+      "blueprint-paper-highlight": {
+        "role": "neutral",
+        "displayName": "Blueprint Highlight",
+        "canonical": "#1b5294",
+        "oklch": "oklch(44.0% 0.122 255.4)",
+        "tonalRamp": [
+          "oklch(15% 0.122 255.4)",
+          "oklch(26% 0.122 255.4)",
+          "oklch(38% 0.122 255.4)",
+          "oklch(49% 0.122 255.4)",
+          "oklch(61% 0.122 255.4)",
+          "oklch(72% 0.122 255.4)",
+          "oklch(84% 0.122 255.4)",
+          "oklch(95% 0.122 255.4)"
+        ],
+        "cssVar": "--paper-hi (prefers-color-scheme: dark / data-theme=\"dark\")"
+      },
+      "blueprint-ink": {
+        "role": "primary",
+        "displayName": "Blueprint White",
+        "canonical": "#f4f8fc",
+        "oklch": "oklch(97.7% 0.007 247.9)",
+        "tonalRamp": [
+          "oklch(15% 0.007 247.9)",
+          "oklch(26% 0.007 247.9)",
+          "oklch(38% 0.007 247.9)",
+          "oklch(49% 0.007 247.9)",
+          "oklch(61% 0.007 247.9)",
+          "oklch(72% 0.007 247.9)",
+          "oklch(84% 0.007 247.9)",
+          "oklch(95% 0.007 247.9)"
+        ],
+        "cssVar": "--ink (prefers-color-scheme: dark / data-theme=\"dark\")"
+      },
+      "blueprint-ink-secondary": {
+        "role": "neutral",
+        "displayName": "Blueprint Secondary Ink",
+        "canonical": "#cadcf0",
+        "oklch": "oklch(88.7% 0.034 251.0)",
+        "tonalRamp": [
+          "oklch(15% 0.034 251.0)",
+          "oklch(26% 0.034 251.0)",
+          "oklch(38% 0.034 251.0)",
+          "oklch(49% 0.034 251.0)",
+          "oklch(61% 0.034 251.0)",
+          "oklch(72% 0.034 251.0)",
+          "oklch(84% 0.034 251.0)",
+          "oklch(95% 0.034 251.0)"
+        ],
+        "cssVar": "--ink-2 (prefers-color-scheme: dark / data-theme=\"dark\")"
+      },
+      "blueprint-ink-faint": {
+        "role": "neutral",
+        "displayName": "Blueprint Faint Ink",
+        "canonical": "#8fb2d8",
+        "oklch": "oklch(75.1% 0.067 250.8)",
+        "tonalRamp": [
+          "oklch(15% 0.067 250.8)",
+          "oklch(26% 0.067 250.8)",
+          "oklch(38% 0.067 250.8)",
+          "oklch(49% 0.067 250.8)",
+          "oklch(61% 0.067 250.8)",
+          "oklch(72% 0.067 250.8)",
+          "oklch(84% 0.067 250.8)",
+          "oklch(95% 0.067 250.8)"
+        ],
+        "cssVar": "--ink-3 (prefers-color-scheme: dark / data-theme=\"dark\")"
+      },
+      "blueprint-orange": {
+        "role": "secondary",
+        "displayName": "Blueprint Orange",
+        "canonical": "#ff7d47",
+        "oklch": "oklch(73.1% 0.173 42.0)",
+        "tonalRamp": [
+          "oklch(15% 0.173 42.0)",
+          "oklch(26% 0.173 42.0)",
+          "oklch(38% 0.173 42.0)",
+          "oklch(49% 0.173 42.0)",
+          "oklch(61% 0.173 42.0)",
+          "oklch(72% 0.173 42.0)",
+          "oklch(84% 0.173 42.0)",
+          "oklch(95% 0.173 42.0)"
+        ],
+        "cssVar": "--orange (prefers-color-scheme: dark / data-theme=\"dark\")"
+      },
+      "grid-minor": {
+        "role": "neutral",
+        "displayName": "Grid Minor (8px)",
+        "canonical": "rgb(20 42 69 / .07)",
+        "cssVar": "--grid-minor"
+      },
+      "grid-major": {
+        "role": "neutral",
+        "displayName": "Grid Major (40px), legend dividers",
+        "canonical": "rgb(20 42 69 / .15)",
+        "cssVar": "--grid-major"
+      },
+      "orange-wash": {
+        "role": "secondary",
+        "displayName": "Orange Wash (hover)",
+        "canonical": "rgb(255 90 31 / .14)",
+        "cssVar": "--orange-wash"
+      },
+      "blueprint-grid-minor": {
+        "role": "neutral",
+        "displayName": "Blueprint Grid Minor",
+        "canonical": "rgb(235 244 255 / .10)",
+        "cssVar": "--grid-minor (prefers-color-scheme: dark / data-theme=\"dark\")"
+      },
+      "blueprint-grid-major": {
+        "role": "neutral",
+        "displayName": "Blueprint Grid Major",
+        "canonical": "rgb(235 244 255 / .22)",
+        "cssVar": "--grid-major (prefers-color-scheme: dark / data-theme=\"dark\")"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display / Stamp",
+        "purpose": "HALT stamp only: 900, capitals, 0.2em tracking."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Title-block field values; 800 for status. Single line with ellipsis."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Room-tag names in capitals; song names at 600 in sentence case."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Base text and speed readout; tabular numerals."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels, door callout, section heads, room name, form labels; 0.08em to 0.12em, capitals, 700 to 800."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Tag sub-lines, scale numbers, wheel readouts."
+      }
+    },
+    "shadows": [
+      {
+        "name": "tag-inner-rule",
+        "value": "inset 0 0 0 3px var(--paper-hi), inset 0 0 0 4px var(--ink-3)",
+        "purpose": "Thin inner line that makes a rectangle a room tag. A drafting mark, not a shadow."
+      },
+      {
+        "name": "tag-inner-rule-pressed",
+        "value": "inset 0 0 0 3px var(--ink), inset 0 0 0 4px var(--paper-hi)",
+        "purpose": "Inner rule on a pressed (inverted) toggle tag."
+      },
+      {
+        "name": "stamp-double-rule",
+        "value": "inset 0 0 0 2px var(--paper), inset 0 0 0 4px var(--orange)",
+        "purpose": "Second rule inside the 3px orange border of the HALT stamp."
+      },
+      {
+        "name": "modal-lift",
+        "value": "0 18px 40px rgb(0 0 0 / .28)",
+        "purpose": "Connection dialog only; the one true shadow. Backdrop rgb(10 25 45 / .5)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "door-swing",
+        "value": "transform .55s cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "Door leaf rotating 90deg open when Drive turns on."
+      },
+      {
+        "name": "door-ajar",
+        "value": "ajar .6s ease-in-out infinite alternate (to rotate 28deg)",
+        "purpose": "Leaf rocks while drive mode wakes (aria-busy)."
+      },
+      {
+        "name": "status-flash",
+        "value": "flash 1.1s ease-out 2",
+        "purpose": "Changed status flashes orange twice, then holds orange until tapped."
+      },
+      {
+        "name": "tag-sent",
+        "value": "sent .5s ease-out (orange to paper-hi)",
+        "purpose": "Confirms a command was sent."
+      },
+      {
+        "name": "hover-fill",
+        "value": "background-color .12s",
+        "purpose": "Orange-wash hover on tags and stamp."
+      },
+      {
+        "name": "press",
+        "value": "translateY(1px) for tags; scale(.97) for the stamp, .1s ease-out",
+        "purpose": "Tactile press."
+      },
+      {
+        "name": "toast-rise",
+        "value": "opacity .18s ease-out, transform .25s cubic-bezier(.2, .8, .2, 1)",
+        "purpose": "Toast rises 12px into place."
+      },
+      {
+        "name": "trail-fade",
+        "value": "7000ms linear alpha fade from .28",
+        "purpose": "Marker trail behind the driving robot (canvas, round caps, width max(6px, 7.5% of room))."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "all animation and transition disabled",
+        "purpose": "prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact",
+        "value": "max-width: 370px",
+        "purpose": "Tag sub-lines hide, tag names 12px, song names 13px."
+      },
+      {
+        "name": "sheet",
+        "value": "min-width: 900px",
+        "purpose": "Two columns: room left (max 640px), 380px side panel right; Project field joins the title block."
+      }
+    ],
+    "lineWeights": [
+      {
+        "name": "wall",
+        "value": "7px",
+        "purpose": "Room walls only (--wall)."
+      },
+      {
+        "name": "door-leaf",
+        "value": "4px",
+        "purpose": "Door leaf."
+      },
+      {
+        "name": "stamp",
+        "value": "3px",
+        "purpose": "HALT stamp border."
+      },
+      {
+        "name": "robot",
+        "value": "2.5px",
+        "purpose": "Robot outline."
+      },
+      {
+        "name": "rule",
+        "value": "1.5px",
+        "purpose": "Every frame and divider (--rule)."
+      },
+      {
+        "name": "grid",
+        "value": "1px",
+        "purpose": "Paper grid and legend row dividers."
+      }
+    ],
+    "fonts": [
+      {
+        "family": "Overpass",
+        "source": "web/fonts/overpass-latin-var.woff2",
+        "weights": "400 900",
+        "license": "OFL"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Room Tag",
+      "kind": "button",
+      "refersTo": "room-tag",
+      "description": "Command button drawn as a room label: frame plus thin inner rule, capital name over a sentence-case sub-line.",
+      "html": "<button class=\"ds-tag\"><b>Clean</b><small>whole room</small></button>",
+      "css": ".ds-tag{display:grid;align-content:center;justify-items:center;gap:1px;min-height:54px;min-width:88px;padding:7px 6px 6px;background:var(--paper-hi,#f2f7f4);color:var(--ink,#142a45);border:1.5px solid var(--ink,#142a45);border-radius:0;box-shadow:inset 0 0 0 3px var(--paper-hi,#f2f7f4),inset 0 0 0 4px var(--ink-3,#8597ab);font-family:Overpass,ui-sans-serif,system-ui,sans-serif;cursor:pointer;transition:background-color .12s}.ds-tag b{font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase}.ds-tag small{font-size:11px;font-weight:600;color:var(--ink-2,#4b6280);letter-spacing:.03em}.ds-tag:hover{background:var(--orange-wash,rgb(255 90 31 / .14));box-shadow:inset 0 0 0 3px transparent,inset 0 0 0 4px var(--ink-3,#8597ab)}.ds-tag:active{transform:translateY(1px)}.ds-tag:focus-visible{outline:2px solid var(--orange,#ff5a1f);outline-offset:3px}"
+    },
+    {
+      "name": "Room Tag (pressed toggle)",
+      "kind": "button",
+      "refersTo": "room-tag-pressed",
+      "description": "Toggle tag when on (Vacuum while driving): inverts to plan-ink fill.",
+      "html": "<button class=\"ds-tag-on\" aria-pressed=\"true\"><b>Vacuum</b><small>while driving</small></button>",
+      "css": ".ds-tag-on{display:grid;align-content:center;justify-items:center;gap:1px;min-height:54px;min-width:180px;padding:7px 6px 6px;background:var(--ink,#142a45);color:var(--paper-hi,#f2f7f4);border:1.5px solid var(--ink,#142a45);border-radius:0;box-shadow:inset 0 0 0 3px var(--ink,#142a45),inset 0 0 0 4px var(--paper-hi,#f2f7f4);font-family:Overpass,ui-sans-serif,system-ui,sans-serif;cursor:pointer}.ds-tag-on b{font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase}.ds-tag-on small{font-size:11px;font-weight:600;letter-spacing:.03em}.ds-tag-on:active{transform:translateY(1px)}.ds-tag-on:focus-visible{outline:2px solid var(--orange,#ff5a1f);outline-offset:3px}"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Solid orange tag for the one confirming action in a dialog (Save & connect).",
+      "html": "<button class=\"ds-btn-primary\"><b>Save &amp; connect</b></button>",
+      "css": ".ds-btn-primary{min-height:44px;padding:0 16px;background:var(--orange,#ff5a1f);color:var(--on-orange,#1b0b02);border:1.5px solid var(--on-orange,#1b0b02);border-radius:0;font-family:Overpass,ui-sans-serif,system-ui,sans-serif;cursor:pointer}.ds-btn-primary b{font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase}.ds-btn-primary:active{transform:translateY(1px)}.ds-btn-primary:focus-visible{outline:2px solid var(--orange,#ff5a1f);outline-offset:3px}"
+    },
+    {
+      "name": "HALT Stamp",
+      "kind": "custom",
+      "refersTo": "stamp",
+      "description": "Emergency stop drawn as a tilted rubber stamp. Light-mode lettering contrast (2.63:1) is a known defect, not a pattern.",
+      "html": "<button class=\"ds-stamp\">Halt</button>",
+      "css": ".ds-stamp{min-height:54px;min-width:180px;display:grid;place-items:center;padding-left:.2em;color:var(--orange,#ff5a1f);background:var(--paper,#e4eee8);border:3px solid var(--orange,#ff5a1f);border-radius:0;box-shadow:inset 0 0 0 2px var(--paper,#e4eee8),inset 0 0 0 4px var(--orange,#ff5a1f);font:900 22px/1 Overpass,ui-sans-serif,system-ui,sans-serif;letter-spacing:.2em;text-transform:uppercase;transform:rotate(-1.5deg);cursor:pointer;transition:transform .1s ease-out,background-color .12s}.ds-stamp:hover{background:var(--orange-wash,rgb(255 90 31 / .14))}.ds-stamp:active{transform:rotate(-1.5deg) scale(.97);background:var(--orange,#ff5a1f);color:var(--on-orange,#1b0b02)}.ds-stamp:focus-visible{outline:2px solid var(--orange,#ff5a1f);outline-offset:3px}"
+    },
+    {
+      "name": "Door Callout",
+      "kind": "custom",
+      "refersTo": "door-callout",
+      "description": "Drive toggle: a door gap in the wall whose leaf swings open and turns orange, with a callout tag on a leader line.",
+      "html": "<button class=\"ds-door\" aria-pressed=\"false\" onclick=\"this.setAttribute('aria-pressed',this.getAttribute('aria-pressed')!=='true');this.querySelector('.ds-callout').textContent=this.getAttribute('aria-pressed')==='true'?'Drive on':'Drive off'\"><span class=\"ds-gap\"></span><svg viewBox=\"0 0 64 64\" aria-hidden=\"true\"><path class=\"ds-swing\" d=\"M 60 0 A 60 60 0 0 1 0 60\"/><line class=\"ds-leaf\" x1=\"0\" y1=\"0\" x2=\"60\" y2=\"0\"/></svg><span class=\"ds-callout\">Drive off</span></button>",
+      "css": ".ds-door{position:relative;display:flex;align-items:center;height:7px;margin:20px 0 70px;padding:0;background:none;border:0;border-top:7px solid var(--ink,#142a45);width:260px;cursor:pointer;font-family:Overpass,ui-sans-serif,system-ui,sans-serif;color:var(--ink,#142a45)}.ds-gap{position:absolute;left:40px;top:-7px;width:64px;height:7px;background:var(--paper,#e4eee8)}.ds-door svg{position:absolute;left:40px;top:0;width:64px;height:64px;overflow:visible}.ds-swing{fill:none;stroke:var(--ink-3,#8597ab);stroke-width:1.2;stroke-dasharray:3 3;opacity:0;transition:opacity .3s}.ds-leaf{stroke:var(--ink,#142a45);stroke-width:4;transform-origin:0 0;transition:transform .55s cubic-bezier(.16,1,.3,1),stroke .2s}.ds-door[aria-pressed=\"true\"] .ds-leaf{transform:rotate(90deg);stroke:var(--orange,#ff5a1f)}.ds-door[aria-pressed=\"true\"] .ds-swing{opacity:1}.ds-callout{position:absolute;left:114px;top:-22px;height:30px;display:flex;align-items:center;padding:1px 10px 0;background:var(--paper-hi,#f2f7f4);border:1.5px solid var(--ink,#142a45);font-weight:700;font-size:12px;letter-spacing:.09em;text-transform:uppercase;white-space:nowrap}.ds-callout::before{content:\"\";position:absolute;right:100%;top:50%;width:10px;height:1.5px;background:var(--ink,#142a45)}.ds-door:hover .ds-callout{background:var(--orange-wash,rgb(255 90 31 / .14))}.ds-door[aria-pressed=\"true\"] .ds-callout{background:var(--orange,#ff5a1f);color:var(--on-orange,#1b0b02);border-color:var(--on-orange,#1b0b02)}.ds-door:focus-visible{outline:none}.ds-door:focus-visible .ds-callout{outline:2px solid var(--orange,#ff5a1f);outline-offset:3px}"
+    },
+    {
+      "name": "Title Block",
+      "kind": "nav",
+      "refersTo": "titleblock-field",
+      "description": "Status strip drawn as a plan title block: framed fields, capital labels over values, link lamp, status holds orange when changed.",
+      "html": "<header class=\"ds-tb\"><button class=\"ds-tb-f ds-alert\"><span class=\"ds-l\">Status</span><span class=\"ds-v\">Docked</span></button><div class=\"ds-tb-f\"><span class=\"ds-l\">Link</span><span class=\"ds-v\"><i class=\"ds-lamp\"></i>Live</span></div><div class=\"ds-tb-f\"><span class=\"ds-l\">Batt</span><span class=\"ds-v\">87%</span></div><button class=\"ds-tb-f ds-setup\">Setup</button></header>",
+      "css": ".ds-tb{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;border:1.5px solid var(--ink,#142a45);background:var(--paper-hi,#f2f7f4);color:var(--ink,#142a45);font-family:Overpass,ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums;max-width:420px}.ds-tb-f{padding:6px 10px 7px;border:0;border-left:1.5px solid var(--ink,#142a45);background:none;color:inherit;font:inherit;text-align:left}.ds-tb-f:first-child{border-left:0}.ds-l{display:block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2,#4b6280);line-height:1.2}.ds-v{display:flex;align-items:center;gap:6px;font-weight:700;font-size:17px;line-height:1.25;white-space:nowrap}.ds-lamp{width:9px;height:9px;border:1.5px solid var(--ink,#142a45);border-radius:50%;background:var(--ink,#142a45)}.ds-alert{background:var(--orange,#ff5a1f);color:var(--on-orange,#1b0b02);cursor:pointer}.ds-alert .ds-l{color:var(--on-orange,#1b0b02)}.ds-alert .ds-v{font-weight:800}.ds-setup{font-weight:700;font-size:12px;letter-spacing:.09em;text-transform:uppercase;cursor:pointer}.ds-setup:hover{background:var(--orange-wash,rgb(255 90 31 / .14))}.ds-tb-f:focus-visible{outline:2px solid var(--orange,#ff5a1f);outline-offset:3px}"
+    },
+    {
+      "name": "Legend Row",
+      "kind": "card",
+      "refersTo": "legend-row",
+      "description": "Songs as a framed legend table with stroked line icons; the playing row fills orange.",
+      "html": "<section class=\"ds-legend\"><h2>Songs <span>tap to play</span></h2><ol><li><button class=\"ds-song\"><svg viewBox=\"0 0 18 18\" aria-hidden=\"true\"><path d=\"M5 13V4l9-2v9 M5 13a2 2 0 1 1-2-2 2 2 0 0 1 2 2z M14 11a2 2 0 1 1-2-2 2 2 0 0 1 2 2z\"/></svg>McDonald's jingle</button></li><li><button class=\"ds-song ds-playing\"><svg viewBox=\"0 0 18 18\" aria-hidden=\"true\"><path d=\"M9 2v2 M4 13c1-1 1-3 1-5a4 4 0 0 1 8 0c0 2 0 4 1 5z M7.5 15a1.5 1.5 0 0 0 3 0\"/></svg>Jingle Bell Rock</button></li></ol></section>",
+      "css": ".ds-legend{border:1.5px solid var(--ink,#142a45);background:var(--paper-hi,#f2f7f4);color:var(--ink,#142a45);font-family:Overpass,ui-sans-serif,system-ui,sans-serif;max-width:380px}.ds-legend h2{margin:0;padding:6px 10px;border-bottom:1.5px solid var(--ink,#142a45);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;display:flex;justify-content:space-between}.ds-legend h2 span{color:var(--ink-2,#4b6280);font-weight:700;letter-spacing:.04em;text-transform:none}.ds-legend ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr}.ds-legend li:first-child{border-right:1px solid var(--grid-major,rgb(20 42 69 / .15))}.ds-song{width:100%;min-height:44px;display:flex;align-items:center;gap:10px;padding:6px 10px;text-align:left;background:none;border:0;color:inherit;font:600 14px Overpass,ui-sans-serif,system-ui,sans-serif;cursor:pointer}.ds-song svg{width:18px;height:18px;flex:none}.ds-song svg *{fill:none;stroke:currentColor;stroke-width:1.8}.ds-song:hover{background:var(--orange-wash,rgb(255 90 31 / .14))}.ds-playing,.ds-playing:hover{background:var(--orange,#ff5a1f);color:var(--on-orange,#1b0b02)}.ds-song:focus-visible{outline:2px solid var(--orange,#ff5a1f);outline-offset:-3px}"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Square ink-framed field with a mint-paper well and capital label; orange focus ring.",
+      "html": "<label class=\"ds-label\" for=\"ds-url\">Broker WebSocket URL</label><input class=\"ds-input\" id=\"ds-url\" placeholder=\"wss://roomba.example.com/mqtt\">",
+      "css": ".ds-label{display:block;font:700 11px Overpass,ui-sans-serif,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2,#4b6280);margin:0 0 4px}.ds-input{width:100%;max-width:360px;padding:10px 10px 8px;border:1.5px solid var(--ink,#142a45);border-radius:0;background:var(--paper,#e4eee8);color:var(--ink,#142a45);font:600 15px Overpass,ui-sans-serif,system-ui,sans-serif;caret-color:var(--orange,#ff5a1f)}.ds-input:focus-visible{outline:2px solid var(--orange,#ff5a1f);outline-offset:1px}"
+    },
+    {
+      "name": "Speed Scale",
+      "kind": "custom",
+      "refersTo": "",
+      "description": "Range control drawn as an alternating architectural scale bar with an orange pentagonal pointer.",
+      "html": "<div class=\"ds-scale\"><span>Speed</span><input type=\"range\" min=\"100\" max=\"500\" step=\"25\" value=\"250\" aria-label=\"Top speed\"><output>250 mm/s</output></div>",
+      "css": ".ds-scale{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;max-width:380px;color:var(--ink,#142a45);font-family:Overpass,ui-sans-serif,system-ui,sans-serif;font-variant-numeric:tabular-nums}.ds-scale span{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2,#4b6280)}.ds-scale output{font-weight:700;font-size:15px}.ds-scale input{-webkit-appearance:none;appearance:none;width:100%;height:30px;background:transparent;margin:0}.ds-scale input::-webkit-slider-runnable-track{height:10px;border:1.5px solid var(--ink,#142a45);background:repeating-linear-gradient(90deg,var(--ink,#142a45) 0 12.5%,var(--paper-hi,#f2f7f4) 12.5% 25%)}.ds-scale input::-moz-range-track{height:10px;border:1.5px solid var(--ink,#142a45);background:repeating-linear-gradient(90deg,var(--ink,#142a45) 0 12.5%,var(--paper-hi,#f2f7f4) 12.5% 25%)}.ds-scale input::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:26px;margin-top:-9px;background:var(--orange,#ff5a1f);border:1.5px solid var(--on-orange,#1b0b02);clip-path:polygon(0 0,100% 0,100% 70%,50% 100%,0 70%)}.ds-scale input::-moz-range-thumb{width:16px;height:26px;border-radius:0;background:var(--orange,#ff5a1f);border:1.5px solid var(--on-orange,#1b0b02)}.ds-scale input:focus-visible{outline:2px solid var(--orange,#ff5a1f);outline-offset:3px}"
+    },
+    {
+      "name": "Toast",
+      "kind": "custom",
+      "refersTo": "toast",
+      "description": "Plan-ink bar with paper capital lettering for transient confirmations.",
+      "html": "<div class=\"ds-toast\" role=\"status\">Song 3 sent</div>",
+      "css": ".ds-toast{display:inline-block;background:var(--ink,#142a45);color:var(--paper-hi,#f2f7f4);padding:8px 14px 7px;font:800 13px Overpass,ui-sans-serif,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;border-radius:0}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Floor Plan You Drive In",
+    "overview": "The remote is an architectural drawing, not a gadget. Every surface is drafting paper with an 8px minor and 40px major grid; every line, label and frame is plan ink; the controls are the things a plan already contains. The drive surface is a square room with thick walls, the drive toggle is a door that swings open, commands are room tags, the songs are a legend table, status sits in a title block, and HALT is a rubber stamp. The robot is drawn top-down in the middle of the room and leaves a fading marker trail as it turns.\n\nDensity is that of a drawing sheet: thin 1.5px rules everywhere, one heavy 7px stroke reserved for walls, capitals with open tracking for every label, tabular numerals for every reading. Colour is two-ink. Navy plan ink does all structural work and a single safety orange marks the robot, the active state, alerts and danger. The world has two native forms: mint drafting paper in light mode and a blueprint (navy paper, white ink) in dark mode; both are the same drawing, never a separate theme.\n\nThe playful-toy brand lives in the details of the drawing (the door leaf swinging on Drive, the stamp tilted off-square, the trail, small line icons for songs), never in decoration added on top of it.",
+    "keyCharacteristics": [
+      "Drafting-paper ground with an 8px / 40px grid on both the page and the room floor.",
+      "Square corners everywhere; the only circles are the robot and the link lamp.",
+      "Two inks: navy for structure, safety orange for robot, active, alert and danger.",
+      "Light mode is mint drafting paper; dark mode is a blueprint of the same plan.",
+      "Capitals with open tracking for labels, tabular numerals for every reading.",
+      "Flat drawing; depth is line weight and inner rules, not shadow."
+    ],
+    "rules": [
+      {
+        "name": "The Two Inks Rule",
+        "body": "Structure is plan ink; state is orange. A new element picks one of the two by asking \"is this live or dangerous?\" No third hue, no gradients, no tinted greys.",
+        "section": "colors"
+      },
+      {
+        "name": "The Orange Means Something Rule",
+        "body": "Orange appears only on the robot, an active or playing state, an alert, focus, or HALT. It is never decoration, never a brand stripe, never a section accent.",
+        "section": "colors"
+      },
+      {
+        "name": "The Same Drawing Rule",
+        "body": "Dark mode is the blueprint of the plan: paper becomes navy, ink becomes white, orange lightens to blueprint-orange. Layout, line weights and components do not change between modes.",
+        "section": "colors"
+      },
+      {
+        "name": "The Lettering Rule",
+        "body": "Labels on the drawing are capitals with open tracking (0.04em to 0.2em); sentence case is reserved for content the user reads as language (song names, tag sub-lines, notes).",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "Every number on the sheet (battery, speed, wheel mm/s, vector length) is set in tabular numerals so readings do not jitter while driving.",
+        "section": "typography"
+      },
+      {
+        "name": "The Drawn Depth Rule",
+        "body": "Nothing on the sheet casts a shadow. Hierarchy is line weight, fill and inner rules; the only lift is the modal dialog, which sits off the drawing.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** draw new controls as plan elements (room tags, callouts with leader lines, legend rows, dimension lines, title-block fields) before inventing a new widget.",
+      "**Do** keep every frame and divider at the 1.5px rule weight and reserve the 7px stroke for walls.",
+      "**Do** use orange only for live, active, alert, focus or danger, and set any text on orange in on-orange.",
+      "**Do** set labels in Overpass capitals with 0.04em to 0.2em tracking and every number in tabular numerals.",
+      "**Do** build both forms from the same tokens: mint paper with navy ink, and the blueprint with white ink.",
+      "**Do** keep a changed status orange until the user acknowledges it.",
+      "**Do** give every pressable surface the orange-wash hover and the 2px orange focus ring."
+    ],
+    "donts": [
+      "**Don't** round corners; the only circles are the robot and the link lamp.",
+      "**Don't** add drop shadows or glows to anything on the sheet; only the modal dialog lifts.",
+      "**Don't** introduce a third hue, gradients or a second typeface.",
+      "**Don't** set words in faint ink (ink-faint is 2.5:1 on paper); it is for drafting marks only.",
+      "**Don't** set small or regular-weight text in orange on light paper; orange is a fill and stroke colour, and text belongs on it, not in it.",
+      "**Don't** draw the drive surface as a circular joystick in a card; steering happens inside the room."
+    ]
+  }
+}

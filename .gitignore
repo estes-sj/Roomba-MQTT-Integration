@@ -1,2 +1,6 @@
 __pycache__/
 *.pyc
+secrets
+.impeccable/review/
+.impeccable/build/
+.impeccable/mocks/

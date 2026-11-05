@@ -3,219 +3,514 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#14161a">
+<meta name="theme-color" content="#e4eee8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16467f" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preload" href="fonts/overpass-latin-var.woff2" as="font" type="font/woff2" crossorigin>
 <title>Roomba Remote</title>
 <style>
-  :root {
-    --bg: #14161a;
-    --panel: #1d2026;
-    --panel-2: #262a32;
-    --line: #333844;
-    --text: #e8eaee;
-    --muted: #8b92a0;
-    --accent: #3ddc97;
-    --accent-ink: #062b1b;
-    --warn: #f2b84b;
-    --danger: #ef5b5b;
-    --danger-ink: #2e0707;
-    --knob: #e8eaee;
-    --radius: 14px;
+  @font-face {
+    font-family: "Overpass";
+    src: url("fonts/overpass-latin-var.woff2") format("woff2");
+    font-weight: 400 900;
+    font-display: swap;
   }
-  @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) {
-      --bg: #eef0f3;
-      --panel: #ffffff;
-      --panel-2: #f3f4f7;
-      --line: #d9dce3;
-      --text: #15181d;
-      --muted: #5f6673;
-      --accent: #12a66a;
-      --accent-ink: #ffffff;
-      --knob: #15181d;
+
+  :root {
+    --paper: #e4eee8;
+    --paper-hi: #f2f7f4;
+    --grid-minor: rgb(20 42 69 / .07);
+    --grid-major: rgb(20 42 69 / .15);
+    --ink: #142a45;
+    --ink-2: #4b6280;
+    --ink-3: #8597ab;
+    --orange: #ff5a1f;
+    --on-orange: #1b0b02;
+    --orange-wash: rgb(255 90 31 / .14);
+    --trail: 255 90 31;
+    --wall: 7px;
+    --rule: 1.5px;
+    --robot-line: #1b0b02;
+    --stamp: #d23c08;   /* darker orange so HALT lettering clears 3:1 on light paper */
+    --font: "Overpass", ui-sans-serif, system-ui, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      /* Blueprint: the plan's own dark form (HA dark themes embed this page) */
+      --paper: #16467f;
+      --paper-hi: #1b5294;
+      --grid-minor: rgb(235 244 255 / .10);
+      --grid-major: rgb(235 244 255 / .22);
+      --ink: #f4f8fc;
+      --ink-2: #cadcf0;
+      --ink-3: #8fb2d8;
+      --orange: #ff7d47;
+      --on-orange: #1b0b02;
+      --orange-wash: rgb(255 125 71 / .22);
+      --trail: 255 125 71;
+      --robot-line: #f4f8fc;
+      --stamp: #ff7d47;
+      color-scheme: dark;
     }
   }
+  :root[data-theme="dark"] {
+    --paper: #16467f; --paper-hi: #1b5294;
+    --grid-minor: rgb(235 244 255 / .10); --grid-major: rgb(235 244 255 / .22);
+    --ink: #f4f8fc; --ink-2: #cadcf0; --ink-3: #8fb2d8;
+    --orange: #ff7d47; --orange-wash: rgb(255 125 71 / .22); --trail: 255 125 71; --robot-line: #f4f8fc; --stamp: #ff7d47;
+    color-scheme: dark;
+  }
+
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; }
+  html, body { margin: 0; min-height: 100%; }
+  html { background-color: var(--paper); }
   body {
-    background: var(--bg);
-    color: var(--text);
-    font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
-    display: flex; flex-direction: column; gap: 12px;
-    max-width: 560px; margin: 0 auto;
+    background-color: var(--paper);
+    min-height: 100vh;
+    color: var(--ink);
+    font: 500 15px/1.35 var(--font);
+    font-variant-numeric: tabular-nums;
+    background-image:
+      linear-gradient(var(--grid-major) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+      linear-gradient(var(--grid-minor) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
+    background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+    background-attachment: fixed;
+    padding: max(12px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
     user-select: none; -webkit-user-select: none;
     overscroll-behavior: none;
+    caret-color: var(--orange);
   }
-  button { font: inherit; color: inherit; }
+  ::selection { background: var(--orange); color: var(--on-orange); }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--orange); outline-offset: 3px; }
+  html { scrollbar-color: var(--ink-3) var(--paper); }
 
-  /* Status bar */
-  .status {
-    display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
-    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 10px 12px;
+  .sheet {
+    max-width: 520px; margin: 0 auto;
+    display: grid; gap: 14px;
   }
-  .status .state { font-weight: 600; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .status .sub { color: var(--muted); font-size: 13px; display: flex; gap: 6px; align-items: center; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); flex: none; }
-  .dot.ok { background: var(--accent); }
-  .dot.wait { background: var(--warn); }
-  .battery { font-variant-numeric: tabular-nums; font-weight: 600; }
-  .icon-btn {
-    width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line);
-    background: var(--panel-2); display: grid; place-items: center; cursor: pointer;
+  @media (min-width: 900px) {
+    .sheet {
+      max-width: 1000px;
+      grid-template-columns: minmax(0, 1fr) 380px;
+      grid-template-areas: "title title" "room side";
+      align-items: start; gap: 18px 28px;
+    }
+    .titleblock { grid-area: title; }
+    .room-wrap { grid-area: room; }
+    .side { grid-area: side; }
   }
-  .icon-btn svg { width: 20px; height: 20px; }
-
-  /* Drive area */
-  .drive {
-    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 14px; display: flex; flex-direction: column; gap: 14px; align-items: center;
+  .side { display: flex; flex-direction: column; gap: 14px; }
+  @media (min-width: 900px) {
+    .side { align-self: stretch; padding-top: 14px; }
+    .side .legend { flex: 1; display: flex; flex-direction: column; }
+    .side .legend ol { flex: 1; grid-auto-rows: 1fr; }
+    .side .legend li { display: flex; }
+    .side .song { min-height: 100%; }
   }
-  .drive-head { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-  .toggle {
-    border: 1px solid var(--line); background: var(--panel-2); border-radius: 999px;
-    padding: 10px 18px; font-weight: 600; cursor: pointer; min-width: 132px;
+  .project { display: none; }
+  @media (min-width: 900px) { .project { display: block; } .sheet .titleblock { grid-template-columns: minmax(0, 1fr) minmax(200px, auto) auto auto auto; } }
+
+  /* ---------- Title block ---------- */
+  .titleblock {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    border: var(--rule) solid var(--ink);
+    background: var(--paper-hi);
   }
-  .toggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
-  .pad-hint { color: var(--muted); font-size: 13px; text-align: right; }
-
-  .stage { position: relative; display: grid; grid-template-columns: 14px minmax(0, 1fr) 14px; gap: 14px; width: 100%; align-items: center; }
-  .wheel { height: 100%; min-height: 180px; background: var(--panel-2); border-radius: 9px; position: relative; overflow: hidden; }
-  .wheel i { position: absolute; left: 0; right: 0; top: 50%; height: 0; background: var(--accent); transition: height .08s, top .08s; }
-  .wheel::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line); }
-
-  .pad {
-    justify-self: center; width: 100%; max-width: 300px; aspect-ratio: 1; border-radius: 50%;
-    background:
-      radial-gradient(circle, transparent 0 32%, var(--line) 32% calc(32% + 1px), transparent calc(32% + 1px)),
-      var(--panel-2);
-    border: 1px solid var(--line); position: relative; touch-action: none;
+  .titleblock > * { border-left: var(--rule) solid var(--ink); padding: 6px 10px 7px; min-width: 0; }
+  .titleblock > :first-child, .titleblock > .project + * { border-left: 0; }
+  .titleblock > .project + * { border-left: var(--rule) solid var(--ink); }
+  @media (max-width: 899px) { .titleblock > .project + * { border-left: 0; } }
+  .field-label {
+    display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--ink-2); line-height: 1.2;
   }
-  .pad::before, .pad::after { content: ""; position: absolute; background: var(--line); }
-  .pad::before { left: 50%; top: 10%; bottom: 10%; width: 1px; }
-  .pad::after { top: 50%; left: 10%; right: 10%; height: 1px; }
-  .knob {
-    position: absolute; left: 50%; top: 50%; width: 34%; aspect-ratio: 1; border-radius: 50%;
-    background: var(--knob); transform: translate(-50%, -50%); z-index: 1;
-    box-shadow: 0 6px 18px rgb(0 0 0 / .35);
+  .field-value { display: block; font-weight: 700; font-size: 17px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status-cell { text-align: left; transition: background-color .2s; }
+  .status-cell .field-value { font-weight: 800; }
+  .status-cell.alert { background: var(--orange); color: var(--on-orange); animation: flash 1.1s ease-out 2; }
+  .status-cell.alert .field-label { color: var(--on-orange); }
+  @keyframes flash { 0%, 40% { background: var(--orange); } 20% { background: var(--paper-hi); } }
+  .link { display: flex; align-items: center; gap: 6px; }
+  .lamp { width: 9px; height: 9px; border: var(--rule) solid var(--ink); border-radius: 50%; flex: none; }
+  .lamp.ok { background: var(--ink); }
+  .lamp.wait { background: linear-gradient(90deg, var(--ink) 50%, transparent 50%); }
+  .lamp.err { background: var(--orange); border-color: var(--orange); }
+  .battery-value { font-size: 17px; }
+  #connText { font-size: 13px; }
+  .setup { font-weight: 700; font-size: 12px; letter-spacing: .09em; text-transform: uppercase; display: grid; place-items: center; }
+  .setup:hover { background: var(--orange-wash); }
+
+  /* ---------- Room ---------- */
+  .room-wrap { position: relative; padding-top: 14px; }
+  .room {
+    position: relative; aspect-ratio: 1; width: 100%;
+    border: var(--wall) solid var(--ink);
+    background: var(--paper);
+    touch-action: none; overflow: hidden;
+    max-height: calc(100svh - 260px); max-width: calc(100svh - 260px); margin: 0 auto;
+    min-height: 280px; min-width: 280px;
   }
-  .knob.live { transition: none; }
-  .knob:not(.live) { transition: transform .15s ease-out; }
-  .drive.off .pad { opacity: .45; }
-
-  .speed { width: 100%; display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; color: var(--muted); font-size: 13px; }
-  .speed output { font-variant-numeric: tabular-nums; color: var(--text); min-width: 66px; text-align: right; }
-  input[type=range] { width: 100%; accent-color: var(--accent); }
-
-  /* Command grid */
-  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .grid h2 { grid-column: 1 / -1; margin: 6px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
-  .cmd {
-    border: 1px solid var(--line); background: var(--panel); border-radius: 12px;
-    padding: 12px 6px; cursor: pointer; font-weight: 500; font-size: 14px; min-height: 48px;
+  @media (min-width: 900px) { .room { max-height: 640px; max-width: 640px; } }
+  .floor {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--grid-major) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+      linear-gradient(var(--grid-minor) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
+    background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
   }
-  .cmd:active { background: var(--panel-2); }
-  .cmd.wide { grid-column: span 2; }
-  .cmd.danger { background: var(--danger); color: var(--danger-ink); border-color: transparent; font-weight: 700; }
-  .cmd[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  .room canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-  .gp { color: var(--muted); font-size: 13px; text-align: center; }
-  .gp b { color: var(--text); font-weight: 600; }
+  /* The door: a gap in the top wall with a plan door leaf and swing arc.
+     Drive on swings the leaf open into the room. */
+  .door {
+    position: absolute; top: 14px; left: calc(50% - 32px); z-index: 3;
+    display: flex; align-items: flex-start;
+  }
+  .door-btn {
+    position: relative; display: flex; align-items: center; gap: 10px;
+    height: var(--wall); padding: 0; outline-offset: 6px;
+  }
+  .door-btn .gap {
+    position: relative; width: 64px; height: var(--wall); background: var(--paper);
+  }
+  .door-btn .gap::before, .door-btn .gap::after {
+    content: ""; position: absolute; top: -3px; bottom: -3px; width: var(--rule); background: var(--ink);
+  }
+  .door-btn .gap::before { left: 0; } .door-btn .gap::after { right: 0; }
+  .door-btn svg {
+    position: absolute; left: 0; top: var(--wall); width: 64px; height: 64px; overflow: visible; pointer-events: none;
+  }
+  .door-btn .swing { fill: none; stroke: var(--ink-3); stroke-width: 1.2; stroke-dasharray: 3 3; opacity: 0; transition: opacity .3s; }
+  .door-btn .leaf {
+    stroke: var(--ink); stroke-width: 4; stroke-linecap: butt;
+    transform-origin: 0 0; transform: rotate(0deg);
+    transition: transform .55s cubic-bezier(.16, 1, .3, 1), stroke .2s;
+  }
+  .door-btn[aria-pressed="true"] .leaf { transform: rotate(90deg); stroke: var(--orange); }
+  .door-btn[aria-pressed="true"] .swing { opacity: 1; }
+  .door-btn[aria-busy="true"] .leaf { animation: ajar .6s ease-in-out infinite alternate; }
+  @keyframes ajar { to { transform: rotate(28deg); } }
+  .door-btn .callout {
+    position: absolute; left: calc(100% + 0px); top: 50%; transform: translateY(-50%);
+    margin-left: 10px; white-space: nowrap;
+    height: 30px; display: flex; align-items: center; gap: 6px; padding: 1px 10px 0;
+    background: var(--paper-hi); border: var(--rule) solid var(--ink);
+    font-weight: 700; font-size: 12px; letter-spacing: .09em; text-transform: uppercase;
+  }
+  .door-btn .callout::before {
+    content: ""; position: absolute; right: 100%; top: 50%; width: 10px; height: var(--rule); background: var(--ink);
+  }
+  .door-btn[aria-pressed="true"] .callout { background: var(--orange); color: var(--on-orange); border-color: var(--on-orange); }
+  .door-btn:hover .callout { background: var(--orange-wash); }
+  .door-btn[aria-pressed="true"]:hover .callout { background: var(--orange); }
+  .door-btn:focus-visible { outline: none; }
+  .door-btn:focus-visible .callout { outline: 2px solid var(--orange); outline-offset: 3px; }
 
-  /* Settings */
+  /* Wheel columns: left wheel on the left wall, right wheel on the right */
+  .wheel {
+    position: absolute; top: 18%; bottom: 18%; width: 14px; z-index: 2;
+    border: var(--rule) solid var(--ink); background: var(--paper-hi);
+  }
+  .wheel.l { left: 10px; } .wheel.r { right: 10px; }
+  .wheel::before {
+    content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(to bottom, var(--ink-3) 0 1px, transparent 1px 10%);
+    opacity: .7;
+  }
+  .wheel::after { content: ""; position: absolute; left: -5px; right: -5px; top: 50%; height: var(--rule); background: var(--ink); }
+  .wheel i { position: absolute; left: 0; right: 0; top: 50%; height: 0; background: var(--orange); }
+  .wheel-read {
+    position: absolute; bottom: 8px; z-index: 2;
+    font-size: 11px; font-weight: 700; letter-spacing: .04em; color: var(--ink-2);
+  }
+  .wheel-read.l { left: 8px; } .wheel-read.r { right: 8px; text-align: right; }
+
+  .robot {
+    position: absolute; left: 50%; top: 50%; width: 22%; aspect-ratio: 1; z-index: 2;
+    transform: translate(-50%, -50%) rotate(var(--heading, 0rad));
+    pointer-events: none;
+  }
+  .robot svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .robot .shell { fill: var(--paper-hi); stroke: var(--ink); stroke-width: 2.5; }
+  .robot .bumper { fill: var(--ink); opacity: .22; }
+  .robot .caster { fill: var(--ink); }
+  .robot .ring { fill: none; stroke: var(--ink); stroke-width: 1.5; }
+  .robot .wedge { fill: var(--ink); }
+  .room.live .robot .shell { fill: var(--orange); stroke: var(--robot-line); }
+  .room.live .robot .bumper { fill: #fff; opacity: .42; }
+  .room.live .robot .caster { fill: var(--robot-line); }
+  .room.live .robot .ring { stroke: var(--robot-line); }
+  .room.offline .robot .shell { stroke-dasharray: 6 5; fill: transparent; }
+
+  /* Steering vector drawn like a dimension line from the robot to the thumb */
+  .vector { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: visible; }
+  .vector[hidden] { display: none; }
+  .vector line { stroke: var(--ink); stroke-width: 1.5; }
+  .vector .tick { stroke-width: 2; }
+  .vector text { fill: var(--ink); font: 700 12px var(--font); letter-spacing: .04em; paint-order: stroke; stroke: var(--paper); stroke-width: 4px; }
+
+  .room-note {
+    position: absolute; left: 50%; bottom: 12%; transform: translateX(-50%); z-index: 2;
+    font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2);
+    background: var(--paper); padding: 2px 6px; white-space: nowrap;
+  }
+  .room-label {
+    position: absolute; left: 30px; top: 12px; z-index: 2;
+    font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2);
+  }
+
+  /* ---------- Scale bar (speed) ---------- */
+  .scale { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+  .scale > .field-label, .scale > output { line-height: 30px; }
+  .scale input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 30px; background: transparent; margin: 0;
+  }
+  .scale input[type=range]::-webkit-slider-runnable-track {
+    height: 10px; border: var(--rule) solid var(--ink);
+    background: repeating-linear-gradient(90deg, var(--ink) 0 12.5%, var(--paper-hi) 12.5% 25%);
+  }
+  .scale input[type=range]::-moz-range-track {
+    height: 10px; border: var(--rule) solid var(--ink);
+    background: repeating-linear-gradient(90deg, var(--ink) 0 12.5%, var(--paper-hi) 12.5% 25%);
+  }
+  .scale input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 16px; height: 26px; margin-top: -9px;
+    background: var(--orange); border: var(--rule) solid var(--on-orange); clip-path: polygon(0 0, 100% 0, 100% 70%, 50% 100%, 0 70%);
+  }
+  .scale input[type=range]::-moz-range-thumb {
+    width: 16px; height: 26px; border-radius: 0;
+    background: var(--orange); border: var(--rule) solid var(--on-orange);
+  }
+  .scale-track { display: grid; gap: 1px; }
+  .scale-nums { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: var(--ink-2); padding: 0 1px; line-height: 1; }
+  .scale output { font-weight: 700; font-size: 15px; min-width: 76px; text-align: right; }
+
+  /* ---------- Room tags (commands) ---------- */
+  .tags { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .tag {
+    position: relative; min-height: 54px; padding: 7px 6px 6px;
+    background: var(--paper-hi); border: var(--rule) solid var(--ink);
+    display: grid; align-content: center; justify-items: center; gap: 1px;
+    box-shadow: inset 0 0 0 3px var(--paper-hi), inset 0 0 0 4px var(--ink-3);
+    transition: background-color .12s;
+  }
+  .tag b { font-weight: 700; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; }
+  .tag small { font-size: 11px; font-weight: 600; color: var(--ink-2); letter-spacing: .03em; }
+  .tag:hover { background: var(--orange-wash); box-shadow: inset 0 0 0 3px transparent, inset 0 0 0 4px var(--ink-3); }
+  .tag:active { transform: translateY(1px); }
+  .tag.sent { animation: sent .5s ease-out; }
+  @keyframes sent { 0% { background: var(--orange); } 100% { background: var(--paper-hi); } }
+  .tag.wide { grid-column: span 2; }
+  .tag[aria-pressed="true"] { background: var(--ink); color: var(--paper-hi); box-shadow: inset 0 0 0 3px var(--ink), inset 0 0 0 4px var(--paper-hi); }
+  .tag[aria-pressed="true"] small { color: var(--paper-hi); }
+  .tag:disabled { opacity: .45; cursor: not-allowed; }
+
+  .stamp {
+    grid-column: span 2; min-height: 54px;
+    color: var(--stamp); border: 3px solid var(--stamp);
+    box-shadow: inset 0 0 0 2px var(--paper), inset 0 0 0 4px var(--stamp);
+    font-weight: 900; font-size: 22px; letter-spacing: .2em; outline: 1px solid transparent; text-transform: uppercase;
+    transform: rotate(-1.5deg) translateZ(0); backface-visibility: hidden; background: var(--paper);
+    display: grid; place-items: center; padding-left: .2em;
+    transition: transform .1s ease-out, background-color .12s;
+  }
+  .stamp:hover { background: var(--orange-wash); }
+  .stamp:active { transform: rotate(-1.5deg) scale(.97) translateZ(0); background: var(--orange); color: var(--on-orange); }
+
+  /* ---------- Legend (songs) ---------- */
+  .legend { border: var(--rule) solid var(--ink); background: var(--paper-hi); }
+  .legend h2 {
+    margin: 0; padding: 6px 10px; border-bottom: var(--rule) solid var(--ink);
+    font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;
+    display: flex; justify-content: space-between;
+  }
+  .legend h2 span { color: var(--ink-2); font-weight: 700; letter-spacing: .04em; text-transform: none; }
+  .legend ol { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; }
+  .legend li { border-top: 1px solid var(--grid-major); }
+  .legend li:nth-child(-n+2) { border-top: 0; }
+  .legend li:nth-child(odd) { border-right: 1px solid var(--grid-major); }
+  .legend li:last-child:nth-child(odd) { grid-column: span 2; border-right: 0; }
+  .song {
+    width: 100%; min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 6px 10px; text-align: left;
+    font-weight: 600; font-size: 14px;
+  }
+  .song svg { width: 18px; height: 18px; flex: none; }
+  .song svg * { fill: none; stroke: var(--ink); stroke-width: 1.8; }
+  .song:hover { background: var(--orange-wash); }
+  .song.playing { background: var(--orange); color: var(--on-orange); }
+  .song.playing svg * { stroke: var(--on-orange); }
+
+  /* ---------- Notes ---------- */
+  .notes { font-size: 12px; color: var(--ink-2); line-height: 1.45; }
+  .notes h2 { margin: 0 0 4px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
+  .notes ol { margin: 0; padding-left: 18px; }
+  .notes b { color: var(--ink); font-weight: 800; }
+  .notes kbd { font: inherit; font-weight: 800; color: var(--ink); }
+
+  /* ---------- Setup sheet ---------- */
   dialog {
-    border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); color: var(--text);
-    width: min(92vw, 420px); padding: 18px;
+    border: var(--rule) solid var(--ink); background: var(--paper-hi); color: var(--ink); padding: 0;
+    width: min(calc(100vw - 32px), 420px); box-shadow: 0 18px 40px rgb(0 0 0 / .28);
   }
-  dialog::backdrop { background: rgb(0 0 0 / .55); }
-  dialog h2 { margin: 0 0 12px; font-size: 18px; }
-  dialog label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  dialog::backdrop { background: rgb(10 25 45 / .5); }
+  dialog h2 { margin: 0; padding: 8px 14px; border-bottom: var(--rule) solid var(--ink); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+  dialog .body { padding: 6px 14px 14px; }
+  dialog label { display: block; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); margin: 12px 0 4px; }
   dialog input {
-    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
-    background: var(--panel-2); color: var(--text); font: inherit;
+    width: 100%; padding: 10px 10px 8px; border: var(--rule) solid var(--ink); border-radius: 0;
+    background: var(--paper); color: var(--ink); font: 600 15px var(--font); user-select: text;
   }
+  dialog input:focus-visible { outline-offset: 1px; }
+  dialog p { font-size: 12px; color: var(--ink-2); margin: 12px 0 0; }
   dialog .row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-  dialog p { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+  dialog .row .tag { min-height: 44px; padding: 0 16px; }
+  dialog .row .primary { background: var(--orange); color: var(--on-orange); border-color: var(--on-orange); box-shadow: none; }
+
   .toast {
-    position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%);
-    background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 999px; font-size: 14px;
-    opacity: 0; pointer-events: none; transition: opacity .2s; max-width: calc(100vw - 32px);
+    position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); z-index: 10;
+    transform: translate(-50%, 12px); opacity: 0; pointer-events: none;
+    background: var(--ink); color: var(--paper-hi); padding: 8px 14px 7px;
+    font-size: 13px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+    transition: opacity .18s ease-out, transform .25s cubic-bezier(.2, .8, .2, 1);
+    max-width: calc(100vw - 32px); white-space: nowrap;
   }
-  .toast.show { opacity: 1; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 370px) {
+    .tag b { font-size: 12px; }
+    .tag small { display: none; }
+    .song { font-size: 13px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
+<main class="sheet">
 
-<header class="status">
-  <div>
-    <div class="state" id="status">Not connected</div>
-    <div class="sub"><span class="dot" id="connDot"></span><span id="connText">Offline</span></div>
-  </div>
-  <div class="battery" id="battery" title="Battery">--%</div>
-  <button class="icon-btn" id="openSettings" aria-label="Connection settings">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-  </button>
-</header>
+  <header class="titleblock">
+    <div class="project">
+      <span class="field-label">Project</span>
+      <span class="field-value">Roomba RC conversion</span>
+    </div>
+    <button class="status-cell" id="statusCell" aria-live="polite" title="Tap to acknowledge">
+      <span class="field-label">Status</span>
+      <span class="field-value" id="status">Not connected</span>
+    </button>
+    <div>
+      <span class="field-label">Link</span>
+      <span class="field-value link"><span class="lamp err" id="lamp"></span><span id="connText">Offline</span></span>
+    </div>
+    <div>
+      <span class="field-label">Batt</span>
+      <span class="field-value battery-value" id="battery">--</span>
+    </div>
+    <button class="setup" id="openSettings" aria-label="Connection setup">Setup</button>
+  </header>
 
-<section class="drive off" id="drive">
-  <div class="drive-head">
-    <button class="toggle" id="driveToggle" aria-pressed="false">Drive: Off</button>
-    <div class="pad-hint" id="padHint">Turn on Drive to steer</div>
-  </div>
-  <div class="stage">
-    <div class="wheel" aria-label="Left wheel"><i id="wheelL"></i></div>
-    <div class="pad" id="pad" aria-label="Joystick"><div class="knob" id="knob"></div></div>
-    <div class="wheel" aria-label="Right wheel"><i id="wheelR"></i></div>
-  </div>
-  <div class="speed">
-    <span>Speed</span>
-    <input type="range" id="speed" min="100" max="500" step="25" value="250">
-    <output id="speedOut">250 mm/s</output>
-  </div>
-</section>
+  <section class="room-wrap" aria-label="Drive">
+    <div class="room offline" id="room">
+      <div class="floor" id="floor"></div>
+      <canvas id="trail"></canvas>
+      <span class="room-label">Floor plan</span>
+      <div class="wheel l" aria-hidden="true"><i id="wheelL"></i></div>
+      <div class="wheel r" aria-hidden="true"><i id="wheelR"></i></div>
+      <span class="wheel-read l" id="readL">L 0</span>
+      <span class="wheel-read r" id="readR">0 R</span>
+      <div class="robot" id="robot" aria-hidden="true">
+        <svg viewBox="-50 -50 100 100">
+          <circle class="shell" r="46"/>
+          <path class="bumper" d="M -40 -22.6 A 46 46 0 0 1 40 -22.6 L 33 -18 A 40 40 0 0 0 -33 -18 Z"/>
+          <circle class="caster" cy="-30" r="3.2"/>
+          <circle class="ring" cy="6" r="14"/>
+          <path class="wedge" d="M 0 -64 L 8 -52 L -8 -52 Z"/>
+        </svg>
+      </div>
+      <svg class="vector" id="vector" hidden>
+        <line id="vLine"/>
+        <line class="tick" id="vTickA"/>
+        <line class="tick" id="vTickB"/>
+        <text id="vText" text-anchor="middle"></text>
+      </svg>
+      <span class="room-note" id="roomNote">Open the door to drive</span>
+    </div>
+    <div class="door">
+      <button class="door-btn" id="driveToggle" aria-pressed="false">
+        <span class="gap" aria-hidden="true"></span>
+        <svg viewBox="0 0 64 64" aria-hidden="true"><path class="swing" d="M 60 0 A 60 60 0 0 1 0 60"/><line class="leaf" x1="0" y1="0" x2="60" y2="0"/></svg>
+        <span class="callout" id="driveText">Drive off</span>
+      </button>
+    </div>
+  </section>
 
-<section class="grid">
-  <h2>Cleaning</h2>
-  <button class="cmd" data-cmd="start">Clean</button>
-  <button class="cmd" data-cmd="spot_clean">Spot</button>
-  <button class="cmd" data-cmd="max_clean">Max</button>
-  <button class="cmd" data-cmd="stop">Dock</button>
-  <button class="cmd wide" id="vacuum" aria-pressed="false">Vacuum while driving</button>
-  <button class="cmd wide danger" data-cmd="halt">Halt</button>
-  <h2>Songs</h2>
-  <button class="cmd" data-cmd="play_song1">McD</button>
-  <button class="cmd" data-cmd="play_song2">Among Us</button>
-  <button class="cmd" data-cmd="play_song3">Eva</button>
-  <button class="cmd" data-cmd="play_song4">Bell Rock</button>
-  <button class="cmd" data-cmd="play_song5">Last Xmas</button>
-</section>
+  <div class="side">
+    <div class="scale">
+      <span class="field-label">Speed</span>
+      <div class="scale-track">
+        <input type="range" id="speed" min="100" max="500" step="25" value="250" aria-label="Top speed">
+        <div class="scale-nums" aria-hidden="true"><span>100</span><span>300</span><span>500</span></div>
+      </div>
+      <output id="speedOut">250 mm/s</output>
+    </div>
 
-<div class="gp" id="gp">No controller. Pair one to this device and press a button.</div>
+    <section class="tags" aria-label="Cleaning">
+      <button class="tag" data-cmd="start"><b>Clean</b><small>whole room</small></button>
+      <button class="tag" data-cmd="spot_clean"><b>Spot</b><small>right here</small></button>
+      <button class="tag" data-cmd="max_clean"><b>Max</b><small>till empty</small></button>
+      <button class="tag" data-cmd="stop"><b>Dock</b><small>go home</small></button>
+      <button class="tag wide" id="vacuum" aria-pressed="false"><b>Vacuum</b><small>while driving</small></button>
+      <button class="stamp" data-cmd="halt">Halt</button>
+    </section>
+
+    <section class="legend" aria-label="Songs">
+      <h2>Songs <span>tap to play</span></h2>
+      <ol id="songs"></ol>
+    </section>
+
+    <section class="notes">
+      <h2>Notes</h2>
+      <ol>
+        <li id="gpNote">Controller: pair one to this device and press any button.</li>
+        <li>Wheels stop 0.6 s after your thumb lifts or the link drops.</li>
+        <li>The trail is drawn from wheel speeds. It shows how you steered, not where the robot really is.</li>
+      </ol>
+    </section>
+  </div>
+</main>
 
 <dialog id="settings">
   <form method="dialog" id="settingsForm">
     <h2>Connection</h2>
-    <label for="url">Broker WebSocket URL</label>
-    <input id="url" placeholder="wss://roomba.example.com/mqtt or ws://192.168.x.x:9001" autocomplete="off" inputmode="url">
-    <label for="user">Username</label>
-    <input id="user" autocomplete="username">
-    <label for="pass">Password</label>
-    <input id="pass" type="password" autocomplete="current-password">
-    <p>Saved on this device only. Use an MQTT account limited to <code>roomba/#</code>.</p>
-    <div class="row">
-      <button class="cmd" value="cancel" formnovalidate>Cancel</button>
-      <button class="cmd" value="save" style="background:var(--accent);color:var(--accent-ink);border-color:transparent">Save &amp; connect</button>
+    <div class="body">
+      <label for="url">Broker WebSocket URL</label>
+      <input id="url" placeholder="wss://roomba.example.com/mqtt" autocomplete="off" inputmode="url" spellcheck="false">
+      <label for="user">Username</label>
+      <input id="user" autocomplete="username" spellcheck="false">
+      <label for="pass">Password</label>
+      <input id="pass" type="password" autocomplete="current-password">
+      <p>Saved on this device only. Use the MQTT account limited to <b>roomba/#</b>.</p>
+      <div class="row">
+        <button class="tag" value="cancel" formnovalidate><b>Cancel</b></button>
+        <button class="tag primary" value="save"><b>Save &amp; connect</b></button>
+      </div>
     </div>
   </form>
 </dialog>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status"></div>
 
 <script src="vendor/mqtt.min.js"></script>
 <script>
@@ -229,7 +524,16 @@
   const DEADZONE = 0.12;
   const TURN_GAIN = 0.6;      // How hard the stick's x-axis turns
   const MAX_WHEEL = 500;
-  const SONGS = ['play_song1', 'play_song2', 'play_song3', 'play_song4', 'play_song5'];
+  const WHEELBASE_MM = 235;   // Roomba wheel spacing, used for the drawn trail
+  const PX_PER_MM = 0.25;     // Trail scale: 1 px = 4 mm
+  const TRAIL_MS = 7000;
+  const SONGS = [
+    { cmd: 'play_song1', name: "McDonald's jingle", match: 'mcdonald', icon: 'M5 13V4l9-2v9 M5 13a2 2 0 1 1-2-2 2 2 0 0 1 2 2z M14 11a2 2 0 1 1-2-2 2 2 0 0 1 2 2z' },
+    { cmd: 'play_song2', name: 'Among Us', match: 'among', icon: 'M6 16V8a4 4 0 0 1 8 0v8 M6 16h3v-2h2v2h3 M8.5 7h5a1.5 1.5 0 0 1 0 3h-5 M14 10h2v4h-2' },
+    { cmd: 'play_song3', name: "A Cruel Angel's Thesis", match: 'angel', icon: 'M9 3l1.6 4.6L15 8l-3.6 2.8L12.5 16 9 13.2 5.5 16l1.1-5.2L3 8l4.4-.4z' },
+    { cmd: 'play_song4', name: 'Jingle Bell Rock', match: 'jingle bell', icon: 'M9 2v2 M4 13c1-1 1-3 1-5a4 4 0 0 1 8 0c0 2 0 4 1 5z M7.5 15a1.5 1.5 0 0 0 3 0' },
+    { cmd: 'play_song5', name: 'Last Christmas', match: 'last christmas', icon: 'M9 2l5 6h-3l4 5h-4l2 3H5l2-3H3l4-5H4z M9 16v2' },
+  ];
 
   const $ = (id) => document.getElementById(id);
   // Settings come from the URL hash first (e.g. an HA iframe card:
@@ -249,16 +553,21 @@
       try { localStorage.setItem('roomba.' + k, v); } catch {}
     },
   };
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ---------- State ----------
   let client = null;
   let connected = false;
   let driveOn = false;
+  let waking = false;
   let vacuumOn = false;
   let touch = { x: 0, y: 0, active: false };
   let pad = { x: 0, y: 0, boost: 0, active: false, prev: [] };
   let stopRepeats = 0;
   let songIndex = 0;
+  let wheels = [0, 0];
+  let lastStatus = '';
+  let lastCommandAt = 0;   // status changes right after a command are expected, not alerts
 
   // ---------- UI helpers ----------
   let toastTimer;
@@ -267,14 +576,25 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
   }
   function setConn(state, text) {
-    $('connDot').className = 'dot' + (state === 'ok' ? ' ok' : state === 'wait' ? ' wait' : '');
+    $('lamp').className = 'lamp ' + state;
     $('connText').textContent = text;
+    $('room').classList.toggle('offline', state !== 'ok');
   }
+  function alertStatus() {
+    $('statusCell').classList.remove('alert');
+    void $('statusCell').offsetWidth;
+    $('statusCell').classList.add('alert');
+  }
+  $('statusCell').addEventListener('click', () => $('statusCell').classList.remove('alert'));
+
   function renderDrive() {
-    $('driveToggle').setAttribute('aria-pressed', String(driveOn));
-    $('driveToggle').textContent = driveOn ? 'Drive: On' : 'Drive: Off';
-    $('drive').classList.toggle('off', !driveOn);
-    $('padHint').textContent = driveOn ? 'Drag to drive' : 'Turn on Drive to steer';
+    const btn = $('driveToggle');
+    btn.setAttribute('aria-pressed', String(driveOn));
+    btn.setAttribute('aria-busy', String(waking && !driveOn));
+    $('driveText').textContent = driveOn ? 'Drive on' : waking ? 'Waking…' : 'Drive off';
+    $('room').classList.toggle('live', driveOn);
+    $('roomNote').textContent = driveOn ? 'Drag anywhere in the room' : waking ? 'Waking the robot…' : 'Open the door to drive';
+    $('roomNote').hidden = driveOn && (touch.active || pad.active);
     $('vacuum').setAttribute('aria-pressed', String(vacuumOn && driveOn));
   }
   function renderWheels(l, r) {
@@ -283,7 +603,19 @@
       el.style.height = pct + '%';
       el.style.top = (v >= 0 ? 50 - pct : 50) + '%';
     }
+    $('readL').textContent = 'L ' + l;
+    $('readR').textContent = r + ' R';
   }
+  function flashTag(el) { el.classList.remove('sent'); void el.offsetWidth; el.classList.add('sent'); }
+  function markPlaying(status) {
+    const s = status.toLowerCase();
+    document.querySelectorAll('.song').forEach((b, i) => b.classList.toggle('playing', s.startsWith('playing') && s.includes(SONGS[i].match)));
+  }
+
+  // Songs legend
+  $('songs').innerHTML = SONGS.map((s) =>
+    `<li><button class="song" data-cmd="${s.cmd}"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="${s.icon}"/></svg><span></span></button></li>`).join('');
+  document.querySelectorAll('.song span').forEach((el, i) => { el.textContent = SONGS[i].name; });
 
   // ---------- MQTT ----------
   // Over HTTPS the broker must be behind the reverse proxy (TLS), at /mqtt.
@@ -297,26 +629,35 @@
     const url = store.get('url', defaultUrl());
     const username = store.get('user', '');
     const password = store.get('pass', '');
-    if (!username) { setConn('err', 'Set up the connection'); $('openSettings').click(); return; }
-    setConn('wait', 'Connecting…');
+    if (!username) { setConn('err', 'Set up'); $('openSettings').click(); return; }
+    setConn('wait', 'Connecting');
     client = mqtt.connect(url, {
       username, password,
       clientId: 'roomba-web-' + Math.random().toString(16).slice(2, 8),
       reconnectPeriod: 2000, connectTimeout: 5000, clean: true,
     });
     client.on('connect', () => {
-      connected = true; setConn('ok', 'Connected');
+      connected = true; setConn('ok', 'Live');
       client.subscribe(['roomba/status', 'roomba/battery', 'roomba/drive/state']);
     });
-    client.on('reconnect', () => setConn('wait', 'Reconnecting to ' + url));
-    client.on('close', () => { connected = false; setConn('err', 'Offline'); });
-    client.on('error', (e) => setConn('err', e.message || 'Error'));
+    client.on('reconnect', () => { setConn('wait', 'Retrying'); $('connText').title = 'Reconnecting to ' + url; });
+    client.on('close', () => {
+      if (connected) alertStatus();
+      connected = false; setConn('err', 'Offline');
+    });
+    client.on('error', (e) => { setConn('err', 'Error'); $('connText').title = e.message || 'Error'; });
     client.on('message', (topic, buf) => {
       const msg = buf.toString();
-      if (topic === 'roomba/status') $('status').textContent = msg;
-      else if (topic === 'roomba/battery') $('battery').textContent = /^\d+$/.test(msg) ? msg + '%' : msg;
-      else if (topic === 'roomba/drive/state') {
+      if (topic === 'roomba/status') {
+        $('status').textContent = msg;
+        if (lastStatus && msg !== lastStatus && !msg.startsWith('Playing') && Date.now() - lastCommandAt > 6000) alertStatus();
+        lastStatus = msg;
+        markPlaying(msg);
+      } else if (topic === 'roomba/battery') {
+        $('battery').textContent = /^\d+$/.test(msg) ? msg + '%' : msg === 'NO DATA' ? '??' : msg;
+      } else if (topic === 'roomba/drive/state') {
         driveOn = msg === 'on';
+        waking = false;
         if (!driveOn) vacuumOn = false;
         renderDrive();
       }
@@ -327,9 +668,12 @@
     client.publish(topic, msg, { qos: 0 });
     return true;
   }
-  function command(cmd) {
-    if (!publish(TOPIC_CMD, cmd)) { toast('Not connected'); return; }
-    if (navigator.vibrate) navigator.vibrate(15);
+  function command(cmd, el) {
+    if (!publish(TOPIC_CMD, cmd)) { toast('Not connected'); return false; }
+    lastCommandAt = Date.now();
+    if (el) flashTag(el);
+    if (navigator.vibrate) navigator.vibrate(12);
+    return true;
   }
 
   // ---------- Drive mixing ----------
@@ -345,7 +689,6 @@
     l /= m; r /= m;
     return [Math.round(l * maxSpeed), Math.round(r * maxSpeed)];
   }
-
   function currentInput() {
     const base = Number($('speed').value);
     if (touch.active) return mix(touch.x, touch.y, base);
@@ -355,6 +698,7 @@
 
   setInterval(() => {
     const [l, r] = driveOn ? currentInput() : [0, 0];
+    wheels = [l, r];
     renderWheels(l, r);
     if (l !== 0 || r !== 0) {
       publish(TOPIC_DRIVE, l + ',' + r);
@@ -367,47 +711,109 @@
   }, SEND_MS);
 
   function emergencyStop() {
-    touch = { x: 0, y: 0, active: false };
+    releaseTouch();
     if (driveOn) { publish(TOPIC_DRIVE, '0,0'); stopRepeats = 3; }
   }
   document.addEventListener('visibilitychange', () => { if (document.hidden) emergencyStop(); });
   window.addEventListener('pagehide', emergencyStop);
   window.addEventListener('blur', emergencyStop);
 
-  // ---------- Touch joystick ----------
-  const padEl = $('pad'), knob = $('knob');
+  // ---------- Trail (dead reckoning from wheel speeds; illustrative) ----------
+  const canvas = $('trail'), ctx = canvas.getContext('2d'), floor = $('floor'), robot = $('robot');
+  let pose = { x: 0, y: 0, h: 0 };   // mm, radians; heading 0 = up the screen
+  let points = [];
+  let lastFrame = performance.now();
+  function sizeCanvas() {
+    const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  new ResizeObserver(sizeCanvas).observe(canvas);
+  function frame(now) {
+    const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
+    const [l, r] = wheels;
+    if (l || r) {
+      const v = (l + r) / 2, w = (r - l) / WHEELBASE_MM;
+      pose.h -= w * dt;
+      pose.x += Math.sin(pose.h) * v * dt;
+      pose.y -= Math.cos(pose.h) * v * dt;
+      if (!reduceMotion) points.push({ x: pose.x, y: pose.y, t: now });
+    }
+    points = points.filter((p) => now - p.t < TRAIL_MS);
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const ox = W / 2 - pose.x * PX_PER_MM, oy = H / 2 - pose.y * PX_PER_MM;
+    floor.style.backgroundPosition = `${ox}px ${oy}px`;
+    robot.style.setProperty('--heading', pose.h + 'rad');
+    ctx.clearRect(0, 0, W, H);
+    if (points.length > 1) {
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(6, W * 0.075);
+      for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1], b = points[i];
+        const age = 1 - (now - b.t) / TRAIL_MS;
+        ctx.strokeStyle = `rgb(${getTrail()} / ${0.28 * age})`;
+        ctx.beginPath();
+        ctx.moveTo(ox + a.x * PX_PER_MM, oy + a.y * PX_PER_MM);
+        ctx.lineTo(ox + b.x * PX_PER_MM, oy + b.y * PX_PER_MM);
+        ctx.stroke();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+  let trailColor = '';
+  const getTrail = () => trailColor || (trailColor = getComputedStyle(document.documentElement).getPropertyValue('--trail').trim());
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { trailColor = ''; });
+  requestAnimationFrame(frame);
+
+  // ---------- Touch steering: drag anywhere in the room ----------
+  const room = $('room'), vec = $('vector');
   let pointerId = null;
-  function moveKnob(clientX, clientY) {
-    const rect = padEl.getBoundingClientRect();
-    const radius = rect.width / 2;
-    let dx = clientX - (rect.left + radius);
-    let dy = clientY - (rect.top + radius);
-    const max = radius - knob.offsetWidth / 2;
+  function steer(clientX, clientY) {
+    const rect = room.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    const max = rect.width * 0.38;
+    let dx = clientX - cx, dy = clientY - cy;
     const d = Math.hypot(dx, dy);
     if (d > max) { dx *= max / d; dy *= max / d; }
-    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-    touch.x = dx / max;
-    touch.y = -dy / max;
+    touch.x = dx / max; touch.y = -dy / max;
+    const w = rect.width / 2 - room.clientLeft, h = rect.height / 2 - room.clientTop;
+    vec.removeAttribute('hidden');
+    const shellR = rect.width * 0.22 * 0.46 + 6;
+    const dist = Math.hypot(dx, dy);
+    vec.style.visibility = dist > shellR + 8 ? 'visible' : 'hidden';
+    const sx = w + dx / (dist || 1) * shellR, sy = h + dy / (dist || 1) * shellR;
+    $('vLine').setAttribute('x1', sx); $('vLine').setAttribute('y1', sy);
+    $('vLine').setAttribute('x2', w + dx); $('vLine').setAttribute('y2', h + dy);
+    // End ticks perpendicular to the line, like a plan dimension
+    const len = Math.hypot(dx, dy) || 1, px = -dy / len * 9, py = dx / len * 9;
+    for (const [id, x, y] of [['vTickA', sx, sy], ['vTickB', w + dx, h + dy]]) {
+      const t = $(id);
+      t.setAttribute('x1', x - px); t.setAttribute('y1', y - py);
+      t.setAttribute('x2', x + px); t.setAttribute('y2', y + py);
+    }
+    const [l, r] = mix(touch.x, touch.y, Number($('speed').value));
+    const label = $('vText');
+    label.textContent = Math.abs(Math.round((l + r) / 2)) + ' mm/s';
+    label.style.display = dist - shellR > 70 ? '' : 'none';
+    label.setAttribute('x', (sx + w + dx) / 2 + px * 2.2); label.setAttribute('y', (sy + h + dy) / 2 + py * 2.2 + 4);
   }
-  padEl.addEventListener('pointerdown', (e) => {
-    if (!driveOn) { toast('Turn on Drive first'); return; }
+  room.addEventListener('pointerdown', (e) => {
+    if (!driveOn) { toast(connected ? 'Open the door first' : 'Not connected'); return; }
     pointerId = e.pointerId;
-    padEl.setPointerCapture(pointerId);
-    knob.classList.add('live');
+    room.setPointerCapture(pointerId);
     touch.active = true;
-    moveKnob(e.clientX, e.clientY);
+    $('roomNote').hidden = true;
+    steer(e.clientX, e.clientY);
   });
-  padEl.addEventListener('pointermove', (e) => { if (e.pointerId === pointerId) moveKnob(e.clientX, e.clientY); });
-  function release(e) {
-    if (e.pointerId !== pointerId) return;
+  room.addEventListener('pointermove', (e) => { if (e.pointerId === pointerId) steer(e.clientX, e.clientY); });
+  function releaseTouch() {
     pointerId = null;
-    knob.classList.remove('live');
-    knob.style.transform = 'translate(-50%, -50%)';
     touch = { x: 0, y: 0, active: false };
+    vec.setAttribute('hidden', '');
+    renderDrive();
   }
-  padEl.addEventListener('pointerup', release);
-  padEl.addEventListener('pointercancel', release);
-  padEl.addEventListener('lostpointercapture', release);
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    room.addEventListener(ev, (e) => { if (e.pointerId === pointerId) releaseTouch(); });
+  }
 
   // ---------- Gamepad (standard mapping) ----------
   // A=0 clean, B=1 dock, X=2 next song, Y=3 vacuum, RT=7 boost, Back=8 halt, Start=9 drive toggle
@@ -429,20 +835,21 @@
     if (edge(GP.START)) toggleDrive();
     if (edge(GP.A)) command('start');
     if (edge(GP.B)) command('stop');
-    if (edge(GP.X)) { command(SONGS[songIndex]); songIndex = (songIndex + 1) % SONGS.length; }
+    if (edge(GP.X)) { command(SONGS[songIndex].cmd); songIndex = (songIndex + 1) % SONGS.length; }
     if (edge(GP.Y)) toggleVacuum();
     if (edge(GP.BACK)) command('halt');
     pad.prev = pressed;
     requestAnimationFrame(pollGamepad);
   }
   window.addEventListener('gamepadconnected', (e) => {
-    $('gp').innerHTML = 'Controller: <b></b><br>Stick drives · RT boost · Start drive · A clean · B dock · X song · Y vacuum · Back halt';
-    $('gp').querySelector('b').textContent = e.gamepad.id.replace(/\s*\(.*\)\s*/, '') || 'Gamepad';
+    const name = e.gamepad.id.replace(/\s*\(.*\)\s*/, '') || 'Gamepad';
+    $('gpNote').innerHTML = '<b></b>: stick drives, <kbd>RT</kbd> boost, <kbd>Start</kbd> door, <kbd>A</kbd> clean, <kbd>B</kbd> dock, <kbd>X</kbd> next song, <kbd>Y</kbd> vacuum, <kbd>Back</kbd> halt.';
+    $('gpNote').querySelector('b').textContent = name;
     toast('Controller connected');
   });
   window.addEventListener('gamepaddisconnected', () => {
     pad = { x: 0, y: 0, boost: 0, active: false, prev: [] };
-    $('gp').textContent = 'Controller disconnected.';
+    $('gpNote').textContent = 'Controller disconnected. Press a button to reconnect.';
     emergencyStop();
   });
   requestAnimationFrame(pollGamepad);
@@ -450,18 +857,18 @@
   // ---------- Buttons ----------
   function toggleDrive() {
     if (!connected) { toast('Not connected'); return; }
-    command(driveOn ? 'drive_off' : 'drive_on');
-    if (!driveOn) toast('Waking Roomba…');
+    if (driveOn) { command('drive_off'); return; }
+    if (command('drive_on')) { waking = true; renderDrive(); setTimeout(() => { waking = false; renderDrive(); }, 8000); }
   }
   function toggleVacuum() {
-    if (!driveOn) { toast('Turn on Drive first'); return; }
+    if (!driveOn) { toast('Open the door first'); return; }
     vacuumOn = !vacuumOn;
     command(vacuumOn ? 'vacuum_on' : 'vacuum_off');
     renderDrive();
   }
   $('driveToggle').addEventListener('click', toggleDrive);
   $('vacuum').addEventListener('click', toggleVacuum);
-  document.querySelectorAll('[data-cmd]').forEach((b) => b.addEventListener('click', () => command(b.dataset.cmd)));
+  document.querySelectorAll('[data-cmd]').forEach((b) => b.addEventListener('click', () => command(b.dataset.cmd, b)));
 
   const speed = $('speed');
   speed.value = store.get('speed', '250');
@@ -484,6 +891,7 @@
   });
 
   renderDrive();
+  renderWheels(0, 0);
   connect();
 })();
 </script>
