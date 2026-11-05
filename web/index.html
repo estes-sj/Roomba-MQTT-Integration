@@ -202,7 +202,7 @@
   <form method="dialog" id="settingsForm">
     <h2>Connection</h2>
     <label for="url">Broker WebSocket URL</label>
-    <input id="url" placeholder="ws://192.168.22.62:9001" autocomplete="off" inputmode="url">
+    <input id="url" placeholder="wss://roomba.example.com/mqtt or ws://192.168.x.x:9001" autocomplete="off" inputmode="url">
     <label for="user">Username</label>
     <input id="user" autocomplete="username">
     <label for="pass">Password</label>
@@ -273,9 +273,11 @@
   }
 
   // ---------- MQTT ----------
+  // Over HTTPS the broker must be behind the reverse proxy (TLS), at /mqtt.
+  // Over plain HTTP on the LAN, talk to Mosquitto's WebSocket listener directly.
   function defaultUrl() {
     const host = location.hostname || '192.168.22.62';
-    return (location.protocol === 'https:' ? 'wss://' : 'ws://') + host + ':9001';
+    return location.protocol === 'https:' ? `wss://${location.host}/mqtt` : `ws://${host}:9001`;
   }
   function connect() {
     if (client) { client.end(true); client = null; }
@@ -293,7 +295,7 @@
       connected = true; setConn('ok', 'Connected');
       client.subscribe(['roomba/status', 'roomba/battery', 'roomba/drive/state']);
     });
-    client.on('reconnect', () => setConn('wait', 'Reconnecting…'));
+    client.on('reconnect', () => setConn('wait', 'Reconnecting to ' + url));
     client.on('close', () => { connected = false; setConn('err', 'Offline'); });
     client.on('error', (e) => setConn('err', e.message || 'Error'));
     client.on('message', (topic, buf) => {

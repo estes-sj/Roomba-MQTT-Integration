@@ -395,7 +395,7 @@ Limit it to `roomba/#` with an ACL file ([docs/acl.example](docs/acl.example)). 
 - **Gamepad support:** pair any Bluetooth or USB controller to the phone or PC and press a button. Mapping: left stick drives, RT boosts up to 500 mm/s, Start toggles drive, A clean, B dock, X next song, Y vacuum, Back halt.
 - Stops automatically when the page is hidden, the app is switched, or the controller disconnects
 
-Host it from Home Assistant by copying the `web/` folder to `<ha config>/www/roomba/`, then open `http://<ha-ip>:8123/local/roomba/index.html`. Tap the gear icon and enter the broker URL (`ws://<mqtt-ip>:9001`) and the `roomba_web` login. Use the browser's *Add to Home Screen* to get it as an app.
+Host it from Home Assistant by copying the `web/` folder to `<ha config>/www/roomba/`, then open `http://<ha-ip>:8123/local/roomba/index.html`. Tap the gear icon and enter the broker URL and the `roomba_web` login. Use `ws://<mqtt-ip>:9001` when the page is opened over plain HTTP. Over HTTPS, browsers only allow `wss://`, and port 9001 has no TLS: proxy a path such as `/mqtt` to port 9001 (with the WebSocket `Upgrade` headers) and use `wss://<your-domain>/mqtt`. The page defaults to that URL when opened over HTTPS. Use the browser's *Add to Home Screen* to get it as an app.
 
 ### Server gamepad bridge
 
