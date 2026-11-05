@@ -232,9 +232,22 @@
   const SONGS = ['play_song1', 'play_song2', 'play_song3', 'play_song4', 'play_song5'];
 
   const $ = (id) => document.getElementById(id);
+  // Settings come from the URL hash first (e.g. an HA iframe card:
+  // index.html#url=wss://host/mqtt&user=roomba_web&pass=...), then localStorage.
+  // The hash never reaches the server. Embedded iframes often get partitioned or
+  // blocked storage, so the in-memory copy keeps the page working either way.
+  const memory = {};
+  const hash = new URLSearchParams(location.hash.slice(1));
+  for (const k of ['url', 'user', 'pass']) if (hash.has(k)) memory[k] = hash.get(k);
   const store = {
-    get(k, d) { try { return localStorage.getItem('roomba.' + k) ?? d; } catch { return d; } },
-    set(k, v) { try { localStorage.setItem('roomba.' + k, v); } catch {} },
+    get(k, d) {
+      if (k in memory) return memory[k];
+      try { return localStorage.getItem('roomba.' + k) ?? d; } catch { return d; }
+    },
+    set(k, v) {
+      memory[k] = v;
+      try { localStorage.setItem('roomba.' + k, v); } catch {}
+    },
   };
 
   // ---------- State ----------

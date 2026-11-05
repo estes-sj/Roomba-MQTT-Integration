@@ -462,13 +462,15 @@ Add these to the `mqtt:` section from the Home Assistant setup above:
         icon: mdi:gamepad-variant
 ```
 
-For a joystick on the dashboard, including the companion app, add a **Webpage** card that embeds the web remote:
+For a joystick on the dashboard, including the companion app, add a **Webpage** card that embeds the web remote. Put the connection settings in the URL hash. Browsers often give embedded pages separate or blocked storage, so a login saved on the standalone page isn't visible inside the card. The hash isn't sent to the web server, but anyone who can edit the dashboard can read it, so use the limited `roomba_web` account:
 
 ```
 type: iframe
-url: /local/roomba/index.html
+url: https://roomba.example.com/#url=wss://roomba.example.com/mqtt&user=roomba_web&pass=<password>
 aspect_ratio: 180%
 ```
+
+URL-encode the password if it contains `&`, `#`, or `+`.
 
 ## Examples
 
