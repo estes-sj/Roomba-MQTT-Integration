@@ -99,6 +99,19 @@ These commands are what are publishable to the MQTT server roomba/commands topic
 - Home Assistant installed and configured.
   - Link to my custom HA setup and its use of the Roomba-MQTT project can be found [here (TODO)](TODO)
 - Flash Roomba_MQTT.ino onto the ESP8266 (with credentials updated)
+  - Set `ota_password` too. After the first USB flash, later updates can go over WiFi (see [OTA Updates](#ota-updates)).
+
+### OTA Updates
+
+The sketch includes ArduinoOTA, so after the first USB flash you never have to unplug the ESP8266 from the Roomba again.
+
+- **Arduino IDE:** with the ESP on the same network, pick the `roomba at <ip>` network port under *Tools > Port* and upload as usual. Enter `ota_password` when asked.
+- **arduino-cli:** `arduino-cli upload --fqbn esp8266:esp8266:nodemcuv2 --port <esp-ip> --protocol network --upload-field password=<ota_password> .` (use your board's FQBN)
+- **espota.py:** `python3 espota.py -i <esp-ip> -a <ota_password> -f Roomba_MQTT.ino.bin`
+
+When an upload starts, the ESP stops the wheels, leaves drive mode, pauses sensor polling, and publishes `Updating firmware` to `roomba/status`. OTA keeps working while the ESP is retrying the MQTT broker. It doesn't work during the first WiFi connect at boot, or while a song is playing (songs block for up to 15 seconds).
+
+The firmware is about 330 KB. OTA needs room for two copies, which still fits on a 1 MB ESP-01 (with the 64 KB filesystem option).
 
 ### Portainer Setup - MQTT Server
 

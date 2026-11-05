@@ -20,10 +20,12 @@
 // 2024-12-05 Added 2 Christmas songs
 // 2026-11-05 Added remote control: roomba/drive topic (Drive Direct), drive_on/drive_off and
 //            vacuum_on/vacuum_off commands, and a watchdog that stops the wheels when input stops
+//            Added over-the-air (OTA) updates via ArduinoOTA
 
 #include <PubSubClient.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
+#include <ArduinoOTA.h>
 #include <SimpleTimer.h>
 #include <Roomba.h>
 
@@ -38,6 +40,8 @@ const char *mqtt_user = "YOUR_MQTT_USERNAME";
 const char *mqtt_pass = "YOUR_MQTT_PASSWORD";
 const char *mqtt_client_name = "Roomba"; // Client connections can't have the same connection name
 const int noSleepPin = 2;
+const char *ota_hostname = "roomba";              // Shows up as roomba.local / a network port in Arduino IDE
+const char *ota_password = "YOUR_OTA_PASSWORD";   // Required to upload firmware over WiFi
 // USER CONFIGURED SECTION END //////////////////////////////
 
 WiFiClient espClient;
@@ -84,6 +88,37 @@ void setup_wifi()
   }
 }
 
+// Lets new firmware be uploaded over WiFi (Arduino IDE network port, arduino-cli, or espota.py).
+// Nothing is printed to Serial because Serial is wired to the Roomba.
+void setup_ota()
+{
+  ArduinoOTA.setHostname(ota_hostname);
+  ArduinoOTA.setPassword(ota_password);
+  ArduinoOTA.onStart([]() {
+    // Make sure the Roomba is not driving while the ESP is busy flashing and rebooting
+    stopWheels();
+    leaveDriveMode();
+    timer.disable(timerId[0]);
+    timer.disable(timerId[1]);
+    client.publish("roomba/status", "Updating firmware");
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    timer.enable(timerId[0]);
+  });
+  ArduinoOTA.begin();
+}
+
+// delay() replacement that keeps OTA responsive while waiting
+void otaDelay(unsigned long ms)
+{
+  unsigned long start = millis();
+  while (millis() - start < ms)
+  {
+    ArduinoOTA.handle();
+    delay(10);
+  }
+}
+
 void reconnect() 
 {
   // Loop until we're reconnected
@@ -114,8 +149,8 @@ void reconnect()
       else 
       {
         retries++;
-        // Wait 5 seconds before retrying
-        delay(5000);
+        // Wait 5 seconds before retrying; OTA still works while the broker is down
+        otaDelay(5000);
       }
     }
     if(retries >= 50)
@@ -1055,6 +1090,7 @@ void setup()
 
   // Setup WiFi and MQTT Connections
   setup_wifi();
+  setup_ota();
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
 
@@ -1076,6 +1112,7 @@ void setup()
 
 void loop() 
 {
+  ArduinoOTA.handle();
   if (!client.connected()) 
   {
     // reconnect() blocks, so the watchdog can't run: stop the wheels first
