@@ -1,0 +1,17 @@
+persistence true
+persistence_location /mosquitto/data/
+user mosquitto
+
+# Plain MQTT: ESP8266, Home Assistant, gamepad bridge
+listener 1883
+
+# MQTT over WebSockets: phone/browser remote (web/index.html)
+listener 9001
+protocol websockets
+
+allow_anonymous false
+password_file /mosquitto/config/credentials
+acl_file /mosquitto/config/acl
+
+log_dest file /mosquitto/log/mosquitto.log
+log_dest stdout

@@ -13,6 +13,7 @@ The Roomba-MQTT integration is a project that allows you to add Wi-Fi connectivi
 - **Wi-Fi Connectivity:** Enables your Roomba 860 to connect to your local Wi-Fi network.
 - **MQTT Control:** Control your Roomba via MQTT messages.
 - **Home Assistant Integration:** Seamlessly integrate your Roomba with Home Assistant.
+- **Remote Control:** Drive the Roomba like an RC car from a phone, a gamepad, or a Home Assistant dashboard. See [Remote Control](#remote-control).
 
 ## Prerequisites
 
@@ -57,18 +58,24 @@ These commands are what are publishable to the MQTT server roomba/commands topic
 | Play Song 1 | `play_song1` | Plays the 5-note McDonald's Jingle |
 | Play Song 2 | `play_song2` | Plays the Among Us song |
 | Play Song 3 | `play_song3` | Plays 'A Cruel Angel's Thesis' song |
-| Play Song 3 | `play_song4` | Plays 'Jingle Bell Rock' song |
-| Play Song 3 | `play_song5` | Plays 'Last Christmas' song |
+| Play Song 4 | `play_song4` | Plays 'Jingle Bell Rock' song |
+| Play Song 5 | `play_song5` | Plays 'Last Christmas' song |
+| Drive On | `drive_on` | Wakes the roomba and enters Safe mode so it accepts `roomba/drive` wheel commands |
+| Drive Off | `drive_off` | Stops the wheels and cleaning motors and leaves drive mode |
+| Vacuum On | `vacuum_on` | Turns on the vacuum and brushes while in drive mode |
+| Vacuum Off | `vacuum_off` | Turns off the vacuum and brushes while in drive mode |
 
 #### MQTT Topics
 
 | **Topic**         | **Publishes/Subscribes** | **Purpose**                                                                | **Possible Values**                                                                                                         |
 | ----------------- | ------------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `roomba/status`   | Publishes                | Current status of the roomba                                               | - Cleaning<br> - Max Cleaning<br> - Spot Cleaning<br> - Returning<br> - Docked<br> - Halted<br> - Playing <name_of_song>    |
+| `roomba/status`   | Publishes                | Current status of the roomba                                               | - Cleaning<br> - Max Cleaning<br> - Spot Cleaning<br> - Returning<br> - Docked<br> - Halted<br> - Remote<br> - Playing <name_of_song> |
 | `roomba/commands` | Subscribes               | Used for issuing commands to the roomba                                    | See MQTT Commands                                                                                                           |
 | `checkIn/roomba`  | Publishes                | Signifies where an established connection is from a reboot or reconnection | - Reconnected<br> - Rebooted                                                                                                |
 | `roomba/battery`  | Publishes                | Battery charge %                                                           | 0-100 integer                                                                                                               |
 | `roomba/charging` | Publishes                | Status code for charging                                                   | - 0 Not Charging<br> - 1 Charging Recovery<br> - 2 Charging<br> - 3 Trickle Charging<br> - 4 Waiting<br> - 5 Charging Error |
+| `roomba/drive`    | Subscribes               | Wheel speeds while in drive mode (OI Drive Direct). Ignored when drive mode is off | `<left>,<right>` in mm/s, -500 to 500 (e.g. `200,200` forward, `150,-150` spin right) |
+| `roomba/drive/state` | Publishes             | Whether drive mode is on                                                   | - on<br> - off                                                                                                              |
 
 ## Installation
 
@@ -326,6 +333,129 @@ mqtt:
 <p align="center">
   <img src="docs/Screenshot_HomeAssistant_10.png" width="80%">
 </p>
+
+## Remote Control
+
+The ESP8266 has no Bluetooth, so every remote talks MQTT. Anything Bluetooth (a controller) pairs with a phone, PC, or the server, and that device forwards over MQTT.
+
+```
+Phone/PC browser (touch joystick, or a BT gamepad paired to the phone/PC) --ws:9001--+
+Server gamepad bridge (BT or USB-dongle controller on the MQTT host) ----tcp:1883----+--> Mosquitto --> ESP8266 --> Roomba
+Home Assistant dashboard (iframe of the web remote + drive buttons) ------------------+
+```
+
+### How driving works
+
+1. Send `drive_on` to `roomba/commands`. The roomba wakes (about 3 seconds) and enters OI Safe mode. Safe mode keeps the cliff and wheel-drop protections active: if one triggers, the roomba stops and switches itself to Passive mode. Send `drive_on` again to keep driving.
+2. Publish `<left>,<right>` wheel speeds to `roomba/drive`. Remotes repeat the current value every 100 ms while the stick is held, then send `0,0` three times on release.
+3. **Watchdog:** if no `roomba/drive` message arrives for 600 ms, the ESP stops the wheels. A dropped phone, closed tab, or WiFi hiccup can't leave it driving. After 5 minutes with no input it leaves drive mode.
+4. `drive_off`, or any cleaning command (`start`, `stop`, `spot_clean`, `max_clean`, `halt`), leaves drive mode. Songs stop the wheels first because they block for several seconds.
+
+### Broker: enable MQTT over WebSockets
+
+Browsers can't speak plain MQTT, so Mosquitto needs a WebSockets listener. See [docs/mosquitto.conf.example](docs/mosquitto.conf.example):
+
+```
+listener 9001
+protocol websockets
+acl_file /mosquitto/config/acl
+```
+
+Publish the port in `docker-compose.yaml` (`- "9001:9001"` under the `mqtt` service's `ports`) and recreate the container with `docker compose up -d mqtt`.
+
+Create a low-privilege account for the remotes, because the web remote keeps its password in the browser:
+
+```
+docker exec mqtt mosquitto_passwd -b /mosquitto/config/credentials roomba_web <password>
+```
+
+Limit it to `roomba/#` with an ACL file ([docs/acl.example](docs/acl.example)). Once `acl_file` is set, **every** user needs an entry in it, including the account the ESP8266 and Home Assistant use.
+
+> If you open the page over HTTPS, the browser requires `wss://`. Put the WebSocket listener behind your TLS reverse proxy, or give Mosquitto a certificate.
+
+### Phone web remote
+
+[web/index.html](web/index.html) is a single page with no build step. mqtt.js is vendored in `web/vendor/`, so it works on a LAN with no internet.
+
+- Touch joystick with live left/right wheel bars, and a speed slider (100 to 500 mm/s)
+- Cleaning, dock, halt, vacuum-while-driving, and song buttons, plus a live status and battery bar
+- **Gamepad support:** pair any Bluetooth or USB controller to the phone or PC and press a button. Mapping: left stick drives, RT boosts up to 500 mm/s, Start toggles drive, A clean, B dock, X next song, Y vacuum, Back halt.
+- Stops automatically when the page is hidden, the app is switched, or the controller disconnects
+
+Host it from Home Assistant by copying the `web/` folder to `<ha config>/www/roomba/`, then open `http://<ha-ip>:8123/local/roomba/index.html`. Tap the gear icon and enter the broker URL (`ws://<mqtt-ip>:9001`) and the `roomba_web` login. Use the browser's *Add to Home Screen* to get it as an app.
+
+### Server gamepad bridge
+
+[bridge/roomba_gamepad.py](bridge/roomba_gamepad.py) reads a controller attached to the MQTT host (via evdev) and publishes the same messages, so no phone is needed. It uses the same button mapping. If the controller turns off or goes out of range, it sends a stop and `drive_off`, then waits for the controller to come back.
+
+Connect the controller to the host:
+
+- **USB dongle** (Xbox wireless adapter, 8BitDo): plug it in.
+- **Bluetooth:** `bluetoothctl` → `power on` → `scan on` → `pair <MAC>` → `trust <MAC>` → `connect <MAC>`. Xbox controllers work best with the `xpadneo` driver.
+
+Run it with Docker Compose:
+
+```
+  roomba-gamepad:
+    container_name: roomba-gamepad
+    build: /path/to/Roomba-MQTT-Integration/bridge
+    restart: unless-stopped
+    devices:
+      - /dev/input:/dev/input
+    environment:
+      MQTT_HOST: 172.16.1.7      # or the host IP
+      MQTT_USER: roomba_web
+      MQTT_PASS: <password>
+      BASE_SPEED: 250            # mm/s without the boost trigger
+      # GAMEPAD_DEVICE: "Xbox"   # optional: device path or part of its name
+    networks:
+      - home-assistant-network
+```
+
+Or run it directly: `pip install -r bridge/requirements.txt`, then `MQTT_HOST=... MQTT_USER=... MQTT_PASS=... python3 bridge/roomba_gamepad.py`. Unit tests for the stick mixing are in `bridge/test_mix.py` (`python3 -m unittest bridge/test_mix.py`).
+
+### Home Assistant
+
+Add these to the `mqtt:` section from the Home Assistant setup above:
+
+```
+  - button:
+      - unique_id: roomba_button_drive_on
+        name: "Roomba Drive On"
+        command_topic: "roomba/commands"
+        payload_press: "drive_on"
+        icon: mdi:gamepad-variant
+      - unique_id: roomba_button_drive_off
+        name: "Roomba Drive Off"
+        command_topic: "roomba/commands"
+        payload_press: "drive_off"
+        icon: mdi:gamepad-variant-outline
+      - unique_id: roomba_button_vacuum_on
+        name: "Roomba Vacuum On"
+        command_topic: "roomba/commands"
+        payload_press: "vacuum_on"
+        icon: mdi:fan
+      - unique_id: roomba_button_vacuum_off
+        name: "Roomba Vacuum Off"
+        command_topic: "roomba/commands"
+        payload_press: "vacuum_off"
+        icon: mdi:fan-off
+  - binary_sensor:
+      - unique_id: roomba_sensor_drive_state
+        name: "Roomba Drive Mode"
+        state_topic: "roomba/drive/state"
+        payload_on: "on"
+        payload_off: "off"
+        icon: mdi:gamepad-variant
+```
+
+For a joystick on the dashboard, including the companion app, add a **Webpage** card that embeds the web remote:
+
+```
+type: iframe
+url: /local/roomba/index.html
+aspect_ratio: 180%
+```
 
 ## Examples
 

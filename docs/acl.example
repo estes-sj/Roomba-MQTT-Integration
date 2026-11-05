@@ -1,0 +1,9 @@
+# Once acl_file is set, every user needs an entry here.
+# Existing accounts (Roomba ESP8266, Home Assistant, ...) keep full access
+user mqtt
+topic readwrite #
+
+# Low-privilege account for the web remote and gamepad bridge,
+# since its password is saved in the browser
+user roomba_web
+topic readwrite roomba/#
