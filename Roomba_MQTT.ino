@@ -21,6 +21,8 @@
 // 2026-11-05 Added remote control: roomba/drive topic (Drive Direct), drive_on/drive_off and
 //            vacuum_on/vacuum_off commands, and a watchdog that stops the wheels when input stops
 //            Added over-the-air (OTA) updates via ArduinoOTA
+//            Sensors now come from the OI sensor stream (opcode 148) instead of polling. Adds wheel
+//            odometry on roomba/odom and bump events on roomba/bump for the mapper service
 
 #include <PubSubClient.h>
 #include <ESP8266WiFi.h>
@@ -58,12 +60,43 @@ long battery_Total_mAh = 0;
 long battery_percent = 0;
 char battery_percent_send[50];
 char battery_Current_mAh_send[50];
-uint8_t tempBuf[10];
 int timerId[2]; // 0 controls sending information, 1 controls automatic waking
 const char* lastTask = "Waiting";
 const char* lastStatus = "Waiting";
 String current_song = "McDonalds";
 bool setupComplete = false; // Flag to track setup completion
+
+// Sensor stream (OI opcode 148): the Roomba pushes these packets every 15 ms.
+// Packet ids and their data sizes in bytes, from the Open Interface spec.
+const uint8_t streamIds[]   = { 7, 21, 25, 26, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51 };
+const uint8_t streamSizes[] = { 1,  1,  2,  2,  2,  2,  2,  2,  1,  2,  2,  2,  2,  2,  2 };
+const uint8_t streamCount = sizeof(streamIds);
+
+struct Sensors
+{
+  uint8_t bumps = 0;          // 7: bit0 right bump, bit1 left bump, bit2 right drop, bit3 left drop
+  uint8_t charging = 0;       // 21: charging state 0-5
+  uint16_t charge = 0;        // 25: mAh
+  uint16_t capacity = 0;      // 26: mAh
+  int16_t reqRight = 0;       // 41: requested right wheel velocity, mm/s (also set by the Roomba's own cleaning)
+  int16_t reqLeft = 0;        // 42
+  uint16_t encLeft = 0;       // 43: cumulative encoder counts, roll over
+  uint16_t encRight = 0;      // 44
+  uint8_t lightBits = 0;      // 45: light bumper hits, bit0 left ... bit5 right
+  uint16_t light[6] = {0};    // 46-51: light bumper signal strength, left ... right
+  unsigned long lastFrameMs = 0;
+  bool valid = false;
+} sensors;
+
+// Odometry, in the odometry frame: x forward and y left of where the robot was at boot (or the
+// last odom_reset), theta counter-clockwise in radians
+const float mmPerCount = 0.4445;   // pi * 72 mm wheel / 508.8 counts per revolution
+const float wheelBaseMm = 235.0;
+float odomX = 0, odomY = 0, odomTheta = 0;
+bool odomPrimed = false;
+uint16_t prevEncLeft = 0, prevEncRight = 0;
+unsigned long lastOdomPublishMs = 0;
+uint8_t lastBumpBits = 0;
 
 // Remote control
 const int maxWheelSpeed = 500;                   // mm/s, OI limit for Drive Direct
@@ -248,6 +281,10 @@ void callback(char* topic, byte* payload, unsigned int length)
     else if (newPayload == "play_song5")
     {
       playSongLastChristmas();
+    }
+    else if (newPayload == "odom_reset")
+    {
+      resetOdometry();
     }
     else if (newPayload == "restart")
     {
@@ -953,26 +990,201 @@ void initializeStartingMusic()
 }
 
 //////////////////////////////////////////////////////////////
+// Sensor Stream and Odometry
+//////////////////////////////////////////////////////////////
+
+// Asks the Roomba to stream the sensor packets in streamIds every 15 ms
+void startSensorStream()
+{
+  Serial.write(148);
+  Serial.write(streamCount);
+  for (uint8_t i = 0; i < streamCount; i++)
+  {
+    Serial.write(streamIds[i]);
+  }
+}
+
+bool streamFresh()
+{
+  return sensors.valid && millis() - sensors.lastFrameMs < 2000;
+}
+
+// Applies one checksum-verified frame body: [id, data...] repeated
+void applyStreamFrame(const uint8_t *data, uint8_t len)
+{
+  uint8_t i = 0;
+  while (i < len)
+  {
+    uint8_t id = data[i++];
+    switch (id)
+    {
+      case 7:  sensors.bumps = data[i]; i += 1; break;
+      case 21: sensors.charging = data[i]; i += 1; break;
+      case 25: sensors.charge = (data[i] << 8) | data[i + 1]; i += 2; break;
+      case 26: sensors.capacity = (data[i] << 8) | data[i + 1]; i += 2; break;
+      case 41: sensors.reqRight = (int16_t)((data[i] << 8) | data[i + 1]); i += 2; break;
+      case 42: sensors.reqLeft = (int16_t)((data[i] << 8) | data[i + 1]); i += 2; break;
+      case 43: sensors.encLeft = (data[i] << 8) | data[i + 1]; i += 2; break;
+      case 44: sensors.encRight = (data[i] << 8) | data[i + 1]; i += 2; break;
+      case 45: sensors.lightBits = data[i]; i += 1; break;
+      default:
+        if (id >= 46 && id <= 51)
+        {
+          sensors.light[id - 46] = (data[i] << 8) | data[i + 1];
+          i += 2;
+        }
+        else
+        {
+          return; // Unknown packet: drop the rest of this frame rather than misread it
+        }
+    }
+  }
+  sensors.valid = true;
+  sensors.lastFrameMs = millis();
+  updateOdometry();
+  checkBump();
+}
+
+// Reads whatever stream bytes have arrived. Frames are: 19, length, body, checksum,
+// and all bytes of a valid frame sum to 0 (mod 256).
+void readSensorStream()
+{
+  static uint8_t state = 0;     // 0 header, 1 length, 2 body, 3 checksum
+  static uint8_t len = 0, pos = 0, sum = 0;
+  static uint8_t body[64];
+
+  while (Serial.available())
+  {
+    uint8_t b = Serial.read();
+    switch (state)
+    {
+      case 0:
+        if (b == 19) { sum = 19; state = 1; }
+        break;
+      case 1:
+        if (b == 0 || b > sizeof(body)) { state = 0; break; }
+        len = b; pos = 0; sum += b; state = 2;
+        break;
+      case 2:
+        body[pos++] = b; sum += b;
+        if (pos >= len) state = 3;
+        break;
+      case 3:
+        sum += b;
+        if (sum == 0)
+        {
+          applyStreamFrame(body, len);
+        }
+        state = 0;
+        break;
+    }
+  }
+}
+
+// Some Roomba models only count encoder ticks upward, whatever the wheel direction, so a tick
+// change that disagrees with the requested wheel direction is flipped to match it.
+float wheelTravelMm(uint16_t now, uint16_t &prev, int16_t requested)
+{
+  int16_t delta = (int16_t)(now - prev);   // Handles the 16-bit rollover
+  prev = now;
+  if (requested < 0 && delta > 0) delta = -delta;
+  if (requested > 0 && delta < 0) delta = -delta;
+  return delta * mmPerCount;
+}
+
+void updateOdometry()
+{
+  if (!odomPrimed)
+  {
+    prevEncLeft = sensors.encLeft;
+    prevEncRight = sensors.encRight;
+    odomPrimed = true;
+    return;
+  }
+  float left = wheelTravelMm(sensors.encLeft, prevEncLeft, sensors.reqLeft);
+  float right = wheelTravelMm(sensors.encRight, prevEncRight, sensors.reqRight);
+  if (fabs(left) > 300 || fabs(right) > 300)
+  {
+    return; // Impossible jump (a misread frame or a long gap): skip it rather than teleport
+  }
+  float distance = (left + right) / 2;
+  float turn = (right - left) / wheelBaseMm;
+  odomX += distance * cos(odomTheta + turn / 2);
+  odomY += distance * sin(odomTheta + turn / 2);
+  odomTheta += turn;
+  if (odomTheta > PI) odomTheta -= 2 * PI;
+  if (odomTheta < -PI) odomTheta += 2 * PI;
+}
+
+void resetOdometry()
+{
+  odomX = odomY = odomTheta = 0;
+  odomPrimed = false;
+}
+
+// Publishes a bump as soon as a bumper or wheel drop goes from clear to pressed
+void checkBump()
+{
+  uint8_t bits = sensors.bumps & 0x0F;
+  if (bits && bits != lastBumpBits)
+  {
+    char msg[96];
+    snprintf(msg, sizeof(msg), "{\"x\":%.0f,\"y\":%.0f,\"th\":%.3f,\"b\":%u,\"lb\":%u}",
+             odomX, odomY, odomTheta, bits, sensors.lightBits);
+    client.publish("roomba/bump", msg);
+  }
+  lastBumpBits = bits;
+}
+
+// roomba/odom: 5 times a second while moving, every 5 seconds while still
+void publishOdometry()
+{
+  if (!streamFresh())
+  {
+    return;
+  }
+  bool moving = sensors.reqLeft != 0 || sensors.reqRight != 0;
+  unsigned long interval = moving ? 200 : 5000;
+  if (millis() - lastOdomPublishMs < interval)
+  {
+    return;
+  }
+  lastOdomPublishMs = millis();
+  char msg[200];
+  snprintf(msg, sizeof(msg),
+           "{\"x\":%.0f,\"y\":%.0f,\"th\":%.3f,\"b\":%u,\"lb\":%u,\"ls\":[%u,%u,%u,%u,%u,%u],\"vl\":%d,\"vr\":%d}",
+           odomX, odomY, odomTheta, sensors.bumps & 0x0F, sensors.lightBits,
+           sensors.light[0], sensors.light[1], sensors.light[2],
+           sensors.light[3], sensors.light[4], sensors.light[5],
+           sensors.reqLeft, sensors.reqRight);
+  client.publish("roomba/odom", msg);
+}
+
+//////////////////////////////////////////////////////////////
 // Sensor Data
 //////////////////////////////////////////////////////////////
 
 void sendInfoRoomba() {
-  // Start (128) drops the Roomba to Passive mode, which would ignore wheel commands
-  if (!driveMode)
+  // The stream stops when the Roomba sleeps or resets. Restart it when frames stop arriving.
+  // Start (128) drops the Roomba to Passive mode, which would ignore wheel commands, so it is
+  // only sent when not driving.
+  if (!streamFresh())
   {
-    roomba.start();
+    if (!driveMode)
+    {
+      Serial.write(128);
+      delay(50);
+    }
+    startSensorStream();
   }
-  // Charging State
-  roomba.getSensors(21, tempBuf, 1);
-  battery_Voltage = tempBuf[0];
-  delay(50);
-  // Battery Charge
-  roomba.getSensors(25, tempBuf, 2);
-  battery_Current_mAh = tempBuf[1]+256*tempBuf[0];
-  delay(50);
-  // Battery Capacity
-  roomba.getSensors(26, tempBuf, 2);
-  battery_Total_mAh = tempBuf[1]+256*tempBuf[0];
+  if (!streamFresh())
+  {
+    client.publish("roomba/battery", "NO DATA");
+    return;
+  }
+  battery_Voltage = sensors.charging;
+  battery_Current_mAh = sensors.charge;
+  battery_Total_mAh = sensors.capacity;
 
   int nBatPcent = 100; // This helps control the no-sleep timer enabling
   if(battery_Total_mAh != 0)
@@ -1082,6 +1294,7 @@ void setup()
   pinMode(noSleepPin, OUTPUT);
   digitalWrite(noSleepPin, HIGH);
   // Change Baud rate
+  Serial.setRxBufferSize(1024); // Holds ~20 stream frames while a song or reconnect blocks the loop
   Serial.begin(115200);
   Serial.write(129);
   delay(50);
@@ -1092,6 +1305,7 @@ void setup()
   setup_wifi();
   setup_ota();
   client.setServer(mqtt_server, mqtt_port);
+  client.setBufferSize(512);
   client.setCallback(callback);
 
   delay(50);
@@ -1106,6 +1320,7 @@ void setup()
   client.publish("roomba/status", lastStatus); // Publishes "Waiting" on startup
 
   playStartupSong(); // Play jingle to indicate setup completion
+  startSensorStream();
 
   setupComplete = true; // Set the setup flag to true
 }
@@ -1120,6 +1335,8 @@ void loop()
     reconnect();
   }
   client.loop();
+  readSensorStream();
+  publishOdometry();
   checkDriveWatchdog();
   timer.run();
 }
