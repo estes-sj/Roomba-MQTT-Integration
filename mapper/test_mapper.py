@@ -127,14 +127,19 @@ class ImportTest(unittest.TestCase):
             cube.AddScaleOp().Set(Gf.Vec3f(*size))
 
         UsdGeom.Xform.Define(stage, "/Room")
-        # 4 m (x) by 3 m (z) room centred on the origin, walls 0.1 m thick, 2.4 m tall
-        box("/Room/Wall_0", (4, 2.4, 0.1), (0, 1.2, -1.5))
-        box("/Room/Wall_1", (4, 2.4, 0.1), (0, 1.2, 1.5))
-        box("/Room/Wall_2", (3, 2.4, 0.1), (-2, 1.2, 0), yaw_deg=90)
-        box("/Room/Wall_3", (3, 2.4, 0.1), (2, 1.2, 0), yaw_deg=90)
-        box("/Room/Door_0", (0.9, 2.0, 0.1), (0.5, 1.0, 1.5))          # in the +z wall
-        box("/Room/Storage_0", (1.2, 0.9, 0.5), (-1.3, 0.45, -1.2))
-        box("/Room/Table_0", (1.0, 0.75, 0.6), (0.5, 0.375, 0))
+        UsdGeom.Xform.Define(stage, "/Room/Section_grp/livingRoom0")
+        # Like real RoomPlan exports, the same room is stored twice (parametric boxes and meshes);
+        # the importer must use only one copy
+        for group in ("Parametric_grp", "Mesh_grp"):
+            r = f"/Room/{group}/"
+            # 4 m (x) by 3 m (z) room centred on the origin, walls 0.1 m thick, 2.4 m tall
+            box(r + "Wall_0", (4, 2.4, 0.1), (0, 1.2, -1.5))
+            box(r + "Wall_1", (4, 2.4, 0.1), (0, 1.2, 1.5))
+            box(r + "Wall_2", (3, 2.4, 0.1), (-2, 1.2, 0), yaw_deg=90)
+            box(r + "Wall_3", (3, 2.4, 0.1), (2, 1.2, 0), yaw_deg=90)
+            box(r + "Door_0", (0.9, 2.0, 0.1), (0.5, 1.0, 1.5))          # in the +z wall
+            box(r + "Storage_0", (1.2, 0.9, 0.5), (-1.3, 0.45, -1.2))
+            box(r + "Table_0", (1.0, 0.75, 0.6), (0.5, 0.375, 0))
         stage.Save()
         usdz = os.path.join(tmp, "room.usdz")
         UsdUtils.CreateNewUsdzPackage(usda, usdz)
@@ -149,6 +154,7 @@ class ImportTest(unittest.TestCase):
         ys = sorted(round((w[1] + w[3]) / 2) for w in plan["walls"] if abs(w[1] - w[3]) < 5)
         self.assertEqual(ys[0], -1500)
         self.assertEqual(ys[-1], 1500)
+        self.assertEqual([r["name"] for r in plan["rooms"]], ["Living room"])
 
 
 class StubClient:

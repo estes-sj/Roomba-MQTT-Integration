@@ -34,6 +34,8 @@ FURNITURE_WORDS = SOLID_FURNITURE | {"table", "chair", "bed", "sofa", "televisio
 # ---------- USDZ (RoomPlan) ----------
 def classify(name):
     n = name.lower()
+    if n.startswith("floor"):
+        return "floor", None
     if "wall" in n:
         return "wall", None
     if "door" in n:
@@ -77,20 +79,33 @@ def import_usdz(path):
         # Looking down from above: Y-up scenes map (X, -Z) to plan (x, y); Z-up scenes use (X, Y)
         return (p[0] * scale, -p[2] * scale) if y_up else (p[0] * scale, p[1] * scale)
 
+    prims = list(stage.Traverse())
+    # RoomPlan exports often hold the same room several times (Parametric_grp as boxes, Mesh_grp
+    # and Model_grp as meshes). Use one copy, preferring the clean parametric boxes.
+    candidates = prims
+    for group in ("Parametric_grp", "Mesh_grp", "Model_grp"):
+        sub = [p for p in prims if f"/{group}/" in str(p.GetPath())]
+        if any(p.IsA(UsdGeom.Gprim) for p in sub):
+            candidates = sub
+            break
+    # Room types from RoomPlan sections (iOS 17+), e.g. Section_grp/livingRoom0
+    sections = [p.GetName() for p in prims if p.GetParent() and p.GetParent().GetName() == "Section_grp"]
+
     items = []
-    taken = []
-    for prim in stage.Traverse():
+    floors = []
+    for prim in candidates:
+        if not prim.IsA(UsdGeom.Gprim):
+            continue  # Only actual shapes; groups like Wall_5_grp also hold the door, Chair_grp all chairs
         kind, word = classify(prim.GetName())
-        if kind is None or not prim.IsA(UsdGeom.Imageable):
+        if kind is None:
             continue
-        path_str = str(prim.GetPath())
-        if any(path_str.startswith(t + "/") for t in taken):
-            continue  # Already took an ancestor with the same meaning (e.g. Wall_0_grp and Wall0)
+        if kind == "floor":
+            floors.append(floor_outline(prim, plan_xy, Usd, UsdGeom, cache, Gf))
+            continue
         bbox = cache.ComputeWorldBound(prim)
         rng = bbox.GetRange()
         if rng.IsEmpty():
             continue
-        taken.append(path_str)
         m = bbox.GetMatrix()
         lo, hi = rng.GetMin(), rng.GetMax()
         corners = [m.Transform(Gf.Vec3d(x, y, z)) for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])]
@@ -110,7 +125,55 @@ def import_usdz(path):
             box = [centre + axis * sa * half_len + perp * sb * half_wid for sa, sb in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
             furniture.append({"type": word, "box": [[round(p[0]), round(p[1])] for p in box],
                               "solid": word in SOLID_FURNITURE})
-    return {"walls": cut_doors(walls, doors), "doors": doors, "furniture": furniture}
+    plan = {"walls": cut_doors(walls, doors), "doors": doors, "furniture": furniture, "rooms": []}
+    outlines = [f for f in floors if f and len(f) >= 3]
+    if len(outlines) <= 1:
+        # One room: RoomPlan's floor polygon can skip alcoves, so outline the walls instead
+        name = room_name(sections[0]) if sections else "Room"
+        if walls:
+            plan["rooms"] = [default_room({"walls": walls, "doors": doors}, name)]
+    else:
+        for i, outline in enumerate(outlines):
+            name = room_name(sections[i]) if i < len(sections) else f"Room {i + 1}"
+            plan["rooms"].append({"name": name, "polygon": outline})
+    return plan
+
+
+def floor_outline(prim, plan_xy, Usd, UsdGeom, cache, Gf):
+    """The floor polygon: a single-face floor mesh lists the room's corners in order."""
+    if prim.IsA(UsdGeom.Mesh):
+        mesh = UsdGeom.Mesh(prim)
+        points = mesh.GetPointsAttr().Get() or []
+        counts = mesh.GetFaceVertexCountsAttr().Get() or []
+        indices = mesh.GetFaceVertexIndicesAttr().Get() or []
+        xf = UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
+        world = [plan_xy(xf.Transform(Gf.Vec3d(*p))) for p in points]
+        if len(counts) == 1 and len(indices) == counts[0]:
+            ring = [world[i] for i in indices]
+        else:
+            ring = hull(world)
+    else:
+        bbox = cache.ComputeWorldBound(prim)
+        lo, hi, m = bbox.GetRange().GetMin(), bbox.GetRange().GetMax(), bbox.GetMatrix()
+        ring = hull([plan_xy(m.Transform(Gf.Vec3d(x, y, z))) for x in (lo[0], hi[0]) for y in (lo[1], hi[1]) for z in (lo[2], hi[2])])
+    out = []
+    for x, y in ring:  # Drop repeated points
+        p = [round(x), round(y)]
+        if not out or math.dist(out[-1], p) > 10:
+            out.append(p)
+    return out
+
+
+def room_name(section):
+    """livingRoom0 -> Living room"""
+    base = section.rstrip("0123456789")
+    words = []
+    for ch in base:
+        if ch.isupper() and words:
+            words.append(" ")
+        words.append(ch.lower())
+    text = "".join(words).strip()
+    return text[:1].upper() + text[1:] if text else "Room"
 
 
 # ---------- DXF ----------
@@ -176,6 +239,29 @@ def subtract(wall, door, tolerance):
         p = a + u * t2
         out.append([round(p[0]), round(p[1]), round(b[0]), round(b[1])])
     return out
+
+
+def align_to_axes(plan):
+    """Rotate the plan so its walls run horizontal and vertical (scans come out at any angle)."""
+    total = 0j
+    for x1, y1, x2, y2 in plan["walls"]:
+        length = math.hypot(x2 - x1, y2 - y1)
+        total += length * complex(math.cos(4 * math.atan2(y2 - y1, x2 - x1)), math.sin(4 * math.atan2(y2 - y1, x2 - x1)))
+    if abs(total) < 1:
+        return plan, 0.0
+    angle = math.atan2(total.imag, total.real) / 4   # Dominant wall direction, modulo 90 degrees
+    c, s = math.cos(-angle), math.sin(-angle)
+
+    def rot(x, y):
+        return [round(x * c - y * s), round(x * s + y * c)]
+
+    plan["walls"] = [rot(a, b) + rot(c_, d) for a, b, c_, d in plan["walls"]]
+    plan["doors"] = [rot(a, b) + rot(c_, d) for a, b, c_, d in plan["doors"]]
+    for item in plan.get("furniture", []):
+        item["box"] = [rot(x, y) for x, y in item["box"]]
+    for room in plan.get("rooms", []):
+        room["polygon"] = [rot(x, y) for x, y in room["polygon"]]
+    return plan, math.degrees(angle)
 
 
 def hull(points):
@@ -254,6 +340,7 @@ def main():
     ap.add_argument("--units", default="mm", choices=["mm", "cm", "m", "in", "ft"], help="DXF drawing units")
     ap.add_argument("--room-name", default="Home", help="name for the default room outline")
     ap.add_argument("--keep", help="existing plan.json whose rooms and dock should be kept")
+    ap.add_argument("--no-align", action="store_true", help="keep the scan's original rotation")
     args = ap.parse_args()
 
     ext = os.path.splitext(args.source)[1].lower()
@@ -266,6 +353,10 @@ def main():
     else:
         sys.exit(f"don't know how to import {ext} files")
     plan = planlib.normalize(plan)
+    if ext != ".json" and not args.no_align:
+        plan, turned = align_to_axes(plan)
+        if abs(turned) > 0.5:
+            print(f"rotated {-turned:.1f} degrees to line the walls up with the axes")
 
     if args.keep and os.path.exists(args.keep):
         old = planlib.load(args.keep)

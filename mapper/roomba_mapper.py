@@ -45,7 +45,7 @@ class Mapper:
         self.lock = threading.Lock()
         self.prev_odom = None
         self.docked = False
-        self.room = None
+        self.room = ""   # Not yet published, so the first pose always sets roomba/room
         self.obstacles = set()
         self.last_obstacle_publish = 0.0
         self.load_plan()
@@ -212,8 +212,14 @@ def main():
 
     client.on_connect = on_connect
     client.on_message = mapper.on_message
-    client.connect(BROKER, PORT, keepalive=30)
-    client.loop_forever(retry_first_connection=True)
+    client.connect_async(BROKER, PORT, keepalive=30)
+    client.loop_start()
+    # Heartbeat: keep the pose fresh for the web remote even while the robot sits still
+    while True:
+        time.sleep(5)
+        if client.is_connected():
+            with mapper.lock:
+                mapper.publish_pose()
 
 
 if __name__ == "__main__":
