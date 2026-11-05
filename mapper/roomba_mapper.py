@@ -33,10 +33,12 @@ PLAN_PATH = os.getenv("PLAN_PATH", os.path.join(DATA_DIR, "plan.json"))
 PARTICLES = int(os.getenv("PARTICLES", "1500"))
 OBSTACLES_PATH = os.path.join(DATA_DIR, "obstacles.json")
 # Odometry calibration: real movement / what the encoders reported. Wheels slip (most of all when
-# spinning in place on carpet), so encoders over-count. Measured on the den floor 2026-11-05:
-# 1 full spin read as ~543 degrees, ~1 m forward read as ~1.42 m.
-DIST_SCALE = float(os.getenv("ODOM_DIST_SCALE", "0.70"))
-TURN_SCALE = float(os.getenv("ODOM_TURN_SCALE", "0.66"))
+# spinning in place on carpet), so encoders over-count. The web remote's Calibrate sheet measures
+# these and saves them to calibration.json; the env values are the starting point. Rough first
+# measurement on the den floor 2026-11-05: 1 full spin read as ~543 degrees, ~1 m read as ~1.42 m.
+CALIBRATION_PATH = os.path.join(DATA_DIR, "calibration.json")
+DEFAULT_DIST_SCALE = float(os.getenv("ODOM_DIST_SCALE", "0.70"))
+DEFAULT_TURN_SCALE = float(os.getenv("ODOM_TURN_SCALE", "0.66"))
 CHARGING_STATES = {"1", "2", "3", "4"}  # Charging recovery, charging, trickle, waiting: on the dock
 
 
@@ -53,8 +55,35 @@ class Mapper:
         self.room = ""   # Not yet published, so the first pose always sets roomba/room
         self.obstacles = set()
         self.last_obstacle_publish = 0.0
+        self.load_calibration()
         self.load_plan()
         self.load_obstacles()
+
+    def load_calibration(self):
+        self.dist_scale, self.turn_scale = DEFAULT_DIST_SCALE, DEFAULT_TURN_SCALE
+        try:
+            with open(CALIBRATION_PATH) as f:
+                data = json.load(f)
+            self.dist_scale = float(data.get("dist_scale", self.dist_scale))
+            self.turn_scale = float(data.get("turn_scale", self.turn_scale))
+        except (OSError, ValueError):
+            pass
+        log.info("odometry calibration: distance x%.3f, turn x%.3f", self.dist_scale, self.turn_scale)
+
+    def save_calibration(self, dist_scale=None, turn_scale=None):
+        if dist_scale:
+            self.dist_scale = min(2.0, max(0.3, float(dist_scale)))
+        if turn_scale:
+            self.turn_scale = min(2.0, max(0.3, float(turn_scale)))
+        with open(CALIBRATION_PATH, "w") as f:
+            json.dump({"dist_scale": self.dist_scale, "turn_scale": self.turn_scale}, f)
+        self.loc.reset_slip(spread=0.05)  # Measured values are close; let the filter fine-tune
+        self.publish_calibration()
+        log.info("calibration saved: distance x%.3f, turn x%.3f", self.dist_scale, self.turn_scale)
+
+    def publish_calibration(self):
+        self.client.publish("roomba/map/calibration", json.dumps(
+            {"dist_scale": self.dist_scale, "turn_scale": self.turn_scale}), retain=True)
 
     # ---------- Plan and stored data ----------
     def load_plan(self):
@@ -74,6 +103,7 @@ class Mapper:
     def publish_plan(self):
         self.client.publish("roomba/map/plan", json.dumps(self.plan, separators=(",", ":")), retain=True)
         self.publish_obstacles(force=True)
+        self.publish_calibration()
 
     def publish_obstacles(self, force=False):
         now = time.time()
@@ -92,7 +122,7 @@ class Mapper:
     def snap_to_dock(self):
         dock = self.plan.get("dock")
         if dock:
-            self.loc.set_pose(dock["x"], dock["y"], math.radians(dock.get("theta_deg", 90)))
+            self.loc.set_pose(dock["x"], dock["y"], math.radians(dock.get("theta_deg", 90)))  # Facing the dock
             log.info("snapped to dock")
 
     def publish_pose(self):
@@ -117,8 +147,8 @@ class Mapper:
         if math.hypot(dx, dy) > 1500:
             log.info("odometry jumped (ESP restart or odom_reset); skipping one step")
             return
-        distance = (dx * math.cos(pth) + dy * math.sin(pth)) * DIST_SCALE   # Signed: negative when reversing
-        turn = wrap(th - pth) * TURN_SCALE
+        distance = (dx * math.cos(pth) + dy * math.sin(pth)) * self.dist_scale   # Signed: negative when reversing
+        turn = wrap(th - pth) * self.turn_scale
         bits = int(msg.get("b", 0))
         if bits & 0x0C:
             return  # A wheel dropped: the robot is lifted or stuck, and spinning wheels count without moving it
@@ -160,12 +190,15 @@ class Mapper:
             self.publish_pose()
         self.docked = docked
 
-    def set_dock(self, x, y):
-        """Place the dock at (x, y), facing away from the nearest wall (docks sit against walls)."""
-        angles = [i * math.pi / 36 for i in range(72)]
-        reach = [float(self.loc.field.lookup(x + 40 * math.cos(a), y + 40 * math.sin(a))) for a in angles]  # Steepest drop
-        toward_wall = angles[reach.index(min(reach))]
-        self.plan["dock"] = {"x": round(x), "y": round(y), "theta_deg": round(math.degrees(toward_wall + math.pi)) % 360}
+    def set_dock(self, x, y, theta_deg=None):
+        """Place the dock at (x, y). theta_deg is the robot's heading while docked: a Roomba docks
+        head-first, so it faces the dock and the wall behind it. Without a heading, face the
+        nearest wall, snapped to the plan's axes."""
+        if theta_deg is None:
+            angles = [i * math.pi / 36 for i in range(72)]
+            near = [float(self.loc.field.lookup(x + 40 * math.cos(a), y + 40 * math.sin(a))) for a in angles]  # Steepest drop
+            theta_deg = round(math.degrees(angles[near.index(min(near))]) / 90) * 90
+        self.plan["dock"] = {"x": round(x), "y": round(y), "theta_deg": round(float(theta_deg)) % 360}
         planlib.save(self.plan, PLAN_PATH)
         log.info("dock set to %s", self.plan["dock"])
         self.publish_plan()
@@ -176,7 +209,9 @@ class Mapper:
         if cmd.startswith("{"):
             data = json.loads(cmd)
             if data.get("cmd") == "set_dock":
-                self.set_dock(float(data["x"]), float(data["y"]))
+                self.set_dock(float(data["x"]), float(data["y"]), data.get("theta_deg"))
+            elif data.get("cmd") == "set_calibration":
+                self.save_calibration(data.get("dist_scale"), data.get("turn_scale"))
         elif cmd == "relocalize":
             self.loc.spread_everywhere()
         elif cmd == "reload":

@@ -191,8 +191,14 @@ class MapperTest(unittest.TestCase):
         rooms = [p for t, p, r in client.published if t == "roomba/room" and r]
         self.assertEqual(rooms[-1], "Living room")
         self.assertTrue(any(t == "roomba/map/plan" and r for t, _, r in client.published))
-        m.on_command('{"cmd":"set_dock","x":6800,"y":1500}')   # against the east wall
-        self.assertEqual(planlib.load(os.environ["PLAN_PATH"])["dock"]["theta_deg"], 180)
+        m.on_command('{"cmd":"set_dock","x":6800,"y":1500}')   # against the east wall: docked facing it
+        self.assertEqual(planlib.load(os.environ["PLAN_PATH"])["dock"]["theta_deg"], 0)
+        m.on_command('{"cmd":"set_dock","x":6800,"y":1500,"theta_deg":15}')
+        self.assertEqual(planlib.load(os.environ["PLAN_PATH"])["dock"]["theta_deg"], 15)
+        m.on_command('{"cmd":"set_calibration","dist_scale":0.8,"turn_scale":0.7}')
+        self.assertEqual((m.dist_scale, m.turn_scale), (0.8, 0.7))
+        with open(os.path.join(tmp, "calibration.json")) as f:
+            self.assertEqual(json.load(f), {"dist_scale": 0.8, "turn_scale": 0.7})
 
 
 if __name__ == "__main__":

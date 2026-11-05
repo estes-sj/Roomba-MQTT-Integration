@@ -8,6 +8,10 @@ Each particle is a guess (x, y, theta) of where the robot is on the floor plan.
   weight. Light bumpers do the same at a slightly longer reach.
 Particles are then resampled in proportion to their weights, so the cloud collapses onto the
 places that agree with everything the robot felt.
+
+Each particle also carries its own guess of how much the wheels slip (a distance factor and a
+turn factor). Particles with the right factors end up agreeing with the walls more often, so
+they survive resampling and the filter learns the floor's slip as it goes.
 """
 import math
 
@@ -36,7 +40,14 @@ class Localizer:
         self.th = np.zeros(self.n)
         self.w = np.full(self.n, 1.0 / self.n)
         self.since_light = 0.0
+        self.ds = np.ones(self.n)   # Per-particle distance slip factor (multiplies the calibrated value)
+        self.ts = np.ones(self.n)   # Per-particle turn slip factor
+        self.reset_slip()
         self.spread_everywhere()
+
+    def reset_slip(self, spread=0.10):
+        self.ds = np.clip(self.rng.normal(1.0, spread, self.n), 0.7, 1.3)
+        self.ts = np.clip(self.rng.normal(1.0, spread, self.n), 0.7, 1.3)
 
     # ---------- Initialisation ----------
     def spread_everywhere(self):
@@ -65,8 +76,11 @@ class Localizer:
         n = self.n
         # Noise per step: wheel slip scales distance a few percent; heading wanders slowly with
         # travel and more with turning (in-place spins slip the most)
-        d = distance * (1 + self.rng.normal(0, 0.03, n)) + self.rng.normal(0, 1.0, n)
-        t = turn * (1 + self.rng.normal(0, 0.15, n)) + self.rng.normal(0, 0.0005 + 0.00008 * abs(distance), n)
+        d = distance * self.ds * (1 + self.rng.normal(0, 0.03, n)) + self.rng.normal(0, 1.0, n)
+        t = turn * self.ts * (1 + self.rng.normal(0, 0.08, n)) + self.rng.normal(0, 0.0005 + 0.00008 * abs(distance), n)
+        # Let the slip factors drift slowly, so the filter can follow carpet-to-floor changes
+        self.ds = np.clip(self.ds + self.rng.normal(0, 0.002, n), 0.7, 1.3)
+        self.ts = np.clip(self.ts + self.rng.normal(0, 0.002, n), 0.7, 1.3)
         mid = self.th + t / 2
         self.x += d * np.cos(mid)
         self.y += d * np.sin(mid)
@@ -119,6 +133,7 @@ class Localizer:
         idx = np.searchsorted(np.cumsum(self.w), positions)
         idx = np.minimum(idx, self.n - 1)
         self.x, self.y, self.th = self.x[idx], self.y[idx], self.th[idx]
+        self.ds, self.ts = self.ds[idx], self.ts[idx]
         self.w[:] = 1.0 / self.n
         # Re-seed a few particles anywhere, so a wrong guess can still recover (kidnapped robot)
         k = max(1, self.n // 200)
@@ -144,4 +159,5 @@ class Localizer:
             confidence = "rough"
         else:
             confidence = "lost"
-        return {"x": round(x), "y": round(y), "th": round(th, 3), "spread": round(spread), "conf": confidence}
+        return {"x": round(x), "y": round(y), "th": round(th, 3), "spread": round(spread), "conf": confidence,
+                "slip": [round(float(np.sum(self.w * self.ds)), 3), round(float(np.sum(self.w * self.ts)), 3)]}
