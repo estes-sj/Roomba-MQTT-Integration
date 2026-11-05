@@ -119,6 +119,11 @@ class Mapper:
             return
         distance = (dx * math.cos(pth) + dy * math.sin(pth)) * DIST_SCALE   # Signed: negative when reversing
         turn = wrap(th - pth) * TURN_SCALE
+        bits = int(msg.get("b", 0))
+        if bits & 0x0C:
+            return  # A wheel dropped: the robot is lifted or stuck, and spinning wheels count without moving it
+        if bits & 0x03 and distance > 0:
+            distance = 0.0  # Pushing into something with a bumper held: the wheels slip, the robot doesn't move
         if not self.docked:
             self.loc.move(distance, turn)
 

@@ -183,6 +183,8 @@ class MapperTest(unittest.TestCase):
         m.on_charging("0")                                # leaves the dock
         for i in range(0, 60):                            # drive 1.2 m forward (+x on the plan)
             m.on_odom({"x": i * 20, "y": 0, "th": 0, "lb": 0})
+        for i in range(60, 120):                          # lifted (wheel drop): wheels spin, robot doesn't move
+            m.on_odom({"x": i * 20, "y": 0, "th": 0, "lb": 0, "b": 12})
         pose = json.loads([p for t, p, _ in client.published if t == "roomba/pose"][-1])
         self.assertAlmostEqual(pose["x"], 300 + 1180, delta=150)
         self.assertEqual(pose["room"], "Living room")
