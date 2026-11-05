@@ -1107,6 +1107,10 @@ void updateOdometry()
   {
     return; // Impossible jump (a misread frame or a long gap): skip it rather than teleport
   }
+  if (sensors.bumps & 0x0C)
+  {
+    return; // A wheel dropped (lifted or stuck): the wheels spin without moving the robot
+  }
   float distance = (left + right) / 2;
   float turn = (right - left) / wheelBaseMm;
   odomX += distance * cos(odomTheta + turn / 2);
