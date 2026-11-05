@@ -91,7 +91,7 @@ The drive area picks the best source automatically:
 
 | Source available | What you see |
 |---|---|
-| Mapper running with a plan | Your real floor plan, rooms labelled, the robot at its position, a 2-minute coverage trail, and discovered obstacles. The room label shows the current room. **Set dock** and **Relocate** buttons appear. |
+| Mapper running with a plan | **Plan** and **Drive** tabs appear. Plan: your floor plan, rooms labelled, the robot at its position (faded while still searching), a 2-minute trail drawn once the position is confident, discovered obstacles, and a joystick that starts where your thumb lands. Drive: the robot-centred view with a fixed joystick. **Dock**, **Relocate** and **Calibrate** buttons appear. |
 | Odometry only | The follow view (robot centred) with a trail from the real encoders. |
 | Neither (old firmware) | The original estimate from your stick input. |
 
@@ -137,9 +137,18 @@ mosquitto_pub -t roomba/map/cmd -m reload
 
 ### 4. Place the dock
 
-On the web remote, tap **Set dock**, then tap the plan where the dock sits. The mapper places it there, facing away from the nearest wall, and saves it to `plan.json`. From then on, every time the robot charges, its position resets to the dock.
+On the web remote, tap **Dock**, press on the plan where the dock sits, and drag toward the direction the robot faces while charging. A Roomba docks head-first, so on the dock it faces the dock and the wall behind it. The heading snaps to 15° steps and starts pointed at the nearest wall. Lift your finger to save it to `plan.json`. From then on, every time the robot charges, its position and heading reset to the dock.
 
-### 5. Drive
+### 5. Calibrate wheel slip
+
+Wheels slip, most of all when spinning in place on carpet, so the encoders over-count. On the first den test, one full spin read as 543° and about 1 m read as 1.42 m. Tap **Calibrate** with Drive on:
+
+- **Spin test**: note which way the robot faces, spin it with the stick exactly 2 full turns until it faces the same way again, then tap Done. The turn factor becomes 720° ÷ what the encoders counted.
+- **Distance test**: mark the floor at the robot's front, drive straight 1–2 m, measure how far it really went, enter it in cm, then tap Done.
+
+The mapper saves the factors to `calibration.json` and applies them to every odometry step. The Drive view uses them too. On top of that, each particle carries its own small slip correction, so the filter keeps fine-tuning during a run (published as `slip` in `roomba/pose`).
+
+### 6. Drive
 
 Press **Clean** or drive it yourself. While the room label says "finding position", the position is still settling. If it is ever clearly wrong, tap **Relocate**: the mapper spreads its guesses over the whole plan and lets bumps narrow them down. Docking also fixes it.
 
@@ -173,13 +182,14 @@ All values are millimetres in the **map frame**: x to the right and y up, as see
 | `roomba/pose` | mapper | `{"x","y","th","conf","spread","room"}` in plan millimetres |
 | `roomba/room` | mapper (retained) | Room name, or `Unknown` |
 | `roomba/map/obstacles` | mapper (retained) | `[[x, y], ...]` bump points not on the plan |
-| `roomba/map/cmd` | you / web remote | `relocalize`, `reload`, `clear_obstacles`, or `{"cmd":"set_dock","x":..,"y":..}` |
+| `roomba/map/calibration` | mapper (retained) | `{"dist_scale","turn_scale"}` odometry slip factors |
+| `roomba/map/cmd` | you / web remote | `relocalize`, `reload`, `clear_obstacles`, `{"cmd":"set_dock","x":..,"y":..,"theta_deg":..}`, or `{"cmd":"set_calibration","dist_scale":..,"turn_scale":..}` |
 
 ## Tuning and limitations
 
 - **It knows where it is; it doesn't plan paths.** The Roomba still cleans with its own bounce behaviour. The mapper tracks and records but doesn't steer.
 - **Long open floors are the hardest case.** With nothing to touch, the cloud spreads until the next wall or light-bumper reading. Rooms with furniture and walls nearby converge fastest.
-- **Carpet edges and thresholds** cause wheel slip. The noise model allows a few percent; if the position drifts badly on your floors, raise the noise in `Localizer.move`.
+- **Wheel slip** is the biggest error source. Run the calibration on the floor the robot uses most. Readings are ignored while a wheel is dropped (robot lifted or stuck), and forward counts are ignored while a bumper is held (pushing into something).
 - **Mirror-image rooms** (two identical rectangles) can confuse a touch-only robot. The dock anchor usually breaks the tie.
 - **Unmapped furniture** is tolerated (bumps are weighted, never trusted absolutely), but scanning with furniture in place gives the best results.
 - **Firmware:** the light bumper packets (45–51) need a 700/800 series or a later 600. Older robots still work, with bumpers only.
