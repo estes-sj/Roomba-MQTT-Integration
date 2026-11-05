@@ -1,0 +1,22 @@
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    # The page changes rarely but should update right away when it does
+    location = /index.html { add_header Cache-Control "no-cache"; }
+    location /fonts/ { add_header Cache-Control "public, max-age=31536000, immutable"; }
+
+    location = /healthz { access_log off; return 200 "ok\n"; }
+
+    # MQTT over WebSockets, so the page can use wss://<same host>/mqtt behind a TLS proxy
+    location /mqtt {
+        proxy_pass http://${MQTT_WS_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 1h;
+        proxy_send_timeout 1h;
+    }
+}
