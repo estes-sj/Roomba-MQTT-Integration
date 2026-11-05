@@ -61,29 +61,38 @@ class Mapper:
 
     def load_calibration(self):
         self.dist_scale, self.turn_scale = DEFAULT_DIST_SCALE, DEFAULT_TURN_SCALE
+        self.dist_scale_back = None   # Reversing slips differently; falls back to the forward factor
         try:
             with open(CALIBRATION_PATH) as f:
                 data = json.load(f)
             self.dist_scale = float(data.get("dist_scale", self.dist_scale))
             self.turn_scale = float(data.get("turn_scale", self.turn_scale))
+            if data.get("dist_scale_back"):
+                self.dist_scale_back = float(data["dist_scale_back"])
         except (OSError, ValueError):
             pass
-        log.info("odometry calibration: distance x%.3f, turn x%.3f", self.dist_scale, self.turn_scale)
+        log.info("odometry calibration: %s", self.calibration())
 
-    def save_calibration(self, dist_scale=None, turn_scale=None):
+    def calibration(self):
+        return {"dist_scale": self.dist_scale, "dist_scale_back": self.dist_scale_back or self.dist_scale,
+                "turn_scale": self.turn_scale}
+
+    def save_calibration(self, dist_scale=None, turn_scale=None, dist_scale_back=None):
+        clamp = lambda v: min(2.0, max(0.3, float(v)))
         if dist_scale:
-            self.dist_scale = min(2.0, max(0.3, float(dist_scale)))
+            self.dist_scale = clamp(dist_scale)
+        if dist_scale_back:
+            self.dist_scale_back = clamp(dist_scale_back)
         if turn_scale:
-            self.turn_scale = min(2.0, max(0.3, float(turn_scale)))
+            self.turn_scale = clamp(turn_scale)
         with open(CALIBRATION_PATH, "w") as f:
-            json.dump({"dist_scale": self.dist_scale, "turn_scale": self.turn_scale}, f)
+            json.dump(self.calibration(), f)
         self.loc.reset_slip(spread=0.05)  # Measured values are close; let the filter fine-tune
         self.publish_calibration()
-        log.info("calibration saved: distance x%.3f, turn x%.3f", self.dist_scale, self.turn_scale)
+        log.info("calibration saved: %s", self.calibration())
 
     def publish_calibration(self):
-        self.client.publish("roomba/map/calibration", json.dumps(
-            {"dist_scale": self.dist_scale, "turn_scale": self.turn_scale}), retain=True)
+        self.client.publish("roomba/map/calibration", json.dumps(self.calibration()), retain=True)
 
     # ---------- Plan and stored data ----------
     def load_plan(self):
@@ -147,7 +156,8 @@ class Mapper:
         if math.hypot(dx, dy) > 1500:
             log.info("odometry jumped (ESP restart or odom_reset); skipping one step")
             return
-        distance = (dx * math.cos(pth) + dy * math.sin(pth)) * self.dist_scale   # Signed: negative when reversing
+        distance = dx * math.cos(pth) + dy * math.sin(pth)   # Signed: negative when reversing
+        distance *= self.dist_scale if distance >= 0 else (self.dist_scale_back or self.dist_scale)
         turn = wrap(th - pth) * self.turn_scale
         bits = int(msg.get("b", 0))
         if bits & 0x0C:
@@ -211,7 +221,7 @@ class Mapper:
             if data.get("cmd") == "set_dock":
                 self.set_dock(float(data["x"]), float(data["y"]), data.get("theta_deg"))
             elif data.get("cmd") == "set_calibration":
-                self.save_calibration(data.get("dist_scale"), data.get("turn_scale"))
+                self.save_calibration(data.get("dist_scale"), data.get("turn_scale"), data.get("dist_scale_back"))
         elif cmd == "relocalize":
             self.loc.spread_everywhere()
         elif cmd == "reload":

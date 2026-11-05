@@ -197,8 +197,9 @@ class MapperTest(unittest.TestCase):
         self.assertEqual(planlib.load(os.environ["PLAN_PATH"])["dock"]["theta_deg"], 15)
         m.on_command('{"cmd":"set_calibration","dist_scale":0.8,"turn_scale":0.7}')
         self.assertEqual((m.dist_scale, m.turn_scale), (0.8, 0.7))
+        m.on_command('{"cmd":"set_calibration","dist_scale_back":0.6}')
         with open(os.path.join(tmp, "calibration.json")) as f:
-            self.assertEqual(json.load(f), {"dist_scale": 0.8, "turn_scale": 0.7})
+            self.assertEqual(json.load(f), {"dist_scale": 0.8, "dist_scale_back": 0.6, "turn_scale": 0.7})
 
 
 if __name__ == "__main__":

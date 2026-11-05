@@ -141,12 +141,12 @@ On the web remote, tap **Dock**, press on the plan where the dock sits, and drag
 
 ### 5. Calibrate wheel slip
 
-Wheels slip, most of all when spinning in place on carpet, so the encoders over-count. On the first den test, one full spin read as 543° and about 1 m read as 1.42 m. Tap **Calibrate** with Drive on:
+Wheels slip, most of all when spinning in place on carpet, so the encoders over-count. On the first den test, one full spin read as 543° and about 1 m read as 1.42 m. Calibration is automatic: tap **Calibrate** with Drive on, clear about 1.5 m of floor, and put a strip of tape at the robot's front.
 
-- **Spin test**: note which way the robot faces, spin it with the stick exactly 2 full turns until it faces the same way again, then tap Done. The turn factor becomes 720° ÷ what the encoders counted.
-- **Distance test**: mark the floor at the robot's front, drive straight 1–2 m, measure how far it really went, enter it in cm, then tap Done.
+- **Forward / Back**: the robot drives what its current calibration believes is 1 m, slowing for the last 20%. Measure how far it really went and enter it in cm. Forward and reverse each get their own factor.
+- **Spin**: the robot spins what it believes is exactly 2 full turns. Enter how many degrees past its starting direction it stopped (negative if short).
 
-The mapper saves the factors to `calibration.json` and applies them to every odometry step. The Drive view uses them too. On top of that, each particle carries its own small slip correction, so the filter keeps fine-tuning during a run (published as `slip` in `roomba/pose`).
+Each factor is real movement ÷ what the encoders counted at the end, so overshooting the target doesn't matter. Repeat a test until the answer comes out close to 100 cm or 0°. A bump, a wheel drop, or touching the stick stops the test. The mapper saves the factors to `calibration.json` and applies them to every odometry step, and the Drive view uses them too. On top of that, each particle carries its own small slip correction, so the filter keeps fine-tuning during a run (published as `slip` in `roomba/pose`).
 
 ### 6. Drive
 
@@ -182,8 +182,8 @@ All values are millimetres in the **map frame**: x to the right and y up, as see
 | `roomba/pose` | mapper | `{"x","y","th","conf","spread","room"}` in plan millimetres |
 | `roomba/room` | mapper (retained) | Room name, or `Unknown` |
 | `roomba/map/obstacles` | mapper (retained) | `[[x, y], ...]` bump points not on the plan |
-| `roomba/map/calibration` | mapper (retained) | `{"dist_scale","turn_scale"}` odometry slip factors |
-| `roomba/map/cmd` | you / web remote | `relocalize`, `reload`, `clear_obstacles`, `{"cmd":"set_dock","x":..,"y":..,"theta_deg":..}`, or `{"cmd":"set_calibration","dist_scale":..,"turn_scale":..}` |
+| `roomba/map/calibration` | mapper (retained) | `{"dist_scale","dist_scale_back","turn_scale"}` odometry slip factors |
+| `roomba/map/cmd` | you / web remote | `relocalize`, `reload`, `clear_obstacles`, `{"cmd":"set_dock","x":..,"y":..,"theta_deg":..}`, or `{"cmd":"set_calibration","dist_scale":..,"dist_scale_back":..,"turn_scale":..}` |
 
 ## Tuning and limitations
 

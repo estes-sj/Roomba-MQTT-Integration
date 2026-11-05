@@ -505,19 +505,23 @@
     <section class="calib" id="calib" aria-label="Calibrate" hidden>
       <h2>Calibrate <button id="closeCalib">Close</button></h2>
       <div id="calibPick">
-        <p>Wheels slip, so the encoders over-count. Measure it once per floor type. Turn Drive on first.</p>
+        <p>The robot drives a set distance or spin by itself, then you say what really happened. Clear about 1.5 m of floor, turn Drive on, and put a strip of tape at the front of the robot.</p>
         <div class="row" style="margin-top:8px">
-          <button class="tag" id="calibTurn"><b>Spin test</b><small>2 full turns</small></button>
-          <button class="tag" id="calibDist"><b>Distance test</b><small>drive and measure</small></button>
+          <button class="tag" data-calib="fwd"><b>Forward</b><small>1 m</small></button>
+          <button class="tag" data-calib="back"><b>Back</b><small>1 m</small></button>
+          <button class="tag" data-calib="spin"><b>Spin</b><small>2 turns</small></button>
         </div>
+        <p id="calibNow" style="margin-top:8px"></p>
       </div>
       <div id="calibRunning" hidden>
         <p id="calibHelp"></p>
-        <div class="reading" id="calibReading">0</div>
+        <div class="reading" id="calibReading"></div>
+        <div class="row" id="calibAnswer" hidden>
+          <label><span id="calibAsk"></span> <input id="calibReal" type="number" inputmode="decimal"> <span id="calibUnit"></span></label>
+        </div>
         <div class="row">
-          <label id="calibRealWrap" hidden>Real distance <input id="calibReal" type="number" inputmode="decimal" min="10" placeholder="cm"> cm</label>
-          <button class="tag" id="calibDone"><b>Done</b><small>save</small></button>
-          <button class="tag" id="calibCancel"><b>Cancel</b></button>
+          <button class="tag" id="calibDone" hidden><b>Save</b></button>
+          <button class="tag" id="calibCancel"><b>Stop</b><small>cancel test</small></button>
         </div>
       </div>
     </section>
@@ -727,7 +731,7 @@
       } else if (topic === 'roomba/map/obstacles') {
         try { obstacles = JSON.parse(msg); } catch {}
       } else if (topic === 'roomba/map/calibration') {
-        try { const c = JSON.parse(msg); calib = { dist: c.dist_scale, turn: c.turn_scale }; } catch {}
+        try { const c = JSON.parse(msg); calib = { dist: c.dist_scale, back: c.dist_scale_back || c.dist_scale, turn: c.turn_scale }; renderCalibNow(); } catch {}
       }
     });
   }
@@ -765,7 +769,7 @@
   }
 
   setInterval(() => {
-    const [l, r] = driveOn ? currentInput() : [0, 0];
+    const [l, r] = driveOn ? (calibCommand() || currentInput()) : [0, 0];
     wheels = [l, r];
     renderWheels(l, r);
     if (l !== 0 || r !== 0) {
@@ -803,7 +807,7 @@
   let dockDraft = null;          // {x, y, th} while placing the dock: tap to place, drag to aim
   let userView = 'plan';         // 'plan' or 'drive', chosen with the view tabs
   try { userView = localStorage.getItem('roomba.view') || 'plan'; } catch {}
-  let calib = { dist: 0.70, turn: 0.66 };
+  let calib = { dist: 0.70, back: 0.70, turn: 0.66 };
   let rawOdom = null;            // last raw odometry message, for deltas
   let calibRun = null;           // {kind: 'turn'|'dist', turn: rad, dist: mm} while a calibration test runs
 
@@ -824,11 +828,15 @@
     if (Math.hypot(dx, dy) > 1500) return;  // ESP restart or odom_reset
     let dist = dx * Math.cos(prev.th) + dy * Math.sin(prev.th);
     let turn = ((o.th - prev.th + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-    if (calibRun) { calibRun.dist += dist; calibRun.turn += turn; renderCalib(); }
+    if (calibRun) {
+      calibRun.dist += dist; calibRun.turn += turn; calibRun.lastOdomAt = Date.now();
+      if (calibRun.phase === 'moving' && (o.b & 0x0F)) abortCalib('Bumped or lifted. Give it more room and try again.');
+      renderCalib();
+    }
     if (mode !== 'odom' || (o.b & 0x0C)) return;   // Lifted: spinning wheels don't move the robot
     if ((o.b & 0x03) && dist > 0) dist = 0;          // Pushing into something: wheels slip
     // Follow view in screen mm (forward = up), corrected for wheel slip
-    dist *= calib.dist; turn *= calib.turn;
+    dist *= dist >= 0 ? calib.dist : calib.back; turn *= calib.turn;
     pose.h -= turn;
     pose.x += Math.sin(pose.h) * dist;
     pose.y -= Math.cos(pose.h) * dist;
@@ -1053,6 +1061,7 @@
       return;
     }
     if (!driveOn) { toast(connected ? 'Open the door first' : 'Not connected'); return; }
+    if (calibRun && calibRun.phase === 'moving') { abortCalib('Test cancelled'); return; }
     origin = mode === 'plan' ? { x: e.clientX, y: e.clientY } : null;
     pointerId = e.pointerId;
     room.setPointerCapture(pointerId);
@@ -1177,42 +1186,91 @@
     applyMode(currentMode());
   }));
 
-  // Calibration: the page sums the raw encoder odometry during a test and compares it with reality
+  // Calibration: the robot drives what the current calibration believes is 1 m (or 2 full turns),
+  // measuring with the raw encoders. You report what really happened; the new factor is
+  // real movement / raw encoder movement, so overshooting the target doesn't matter.
+  const CALIB = {
+    fwd:  { label: 'Forward 1 m', target: () => 1000 / calib.dist, wheels: [[200, 200], [80, 80]] },
+    back: { label: 'Back 1 m', target: () => 1000 / calib.back, wheels: [[-200, -200], [-80, -80]] },
+    spin: { label: 'Spin 2 turns', target: () => 4 * Math.PI / calib.turn, wheels: [[120, -120], [55, -55]] },
+  };
+  function renderCalibNow() {
+    $('calibNow').textContent = `Current factors: forward ×${calib.dist.toFixed(2)}, back ×${calib.back.toFixed(2)}, turn ×${calib.turn.toFixed(2)}`;
+  }
+  function calibProgress() {
+    return calibRun.kind === 'spin' ? Math.abs(calibRun.turn) : Math.abs(calibRun.dist);
+  }
+  // Wheel speeds for the send loop while a test is moving: full speed, then slow for the last 20%
+  function calibCommand() {
+    if (!calibRun || calibRun.phase !== 'moving') return null;
+    const done = calibProgress() / calibRun.target;
+    if (done >= 1) { calibRun.phase = 'settling'; calibRun.stoppedAt = Date.now(); renderCalib(); return [0, 0]; }
+    if (Date.now() - calibRun.startedAt > 60000) { abortCalib('Took too long. Is the robot stuck?'); return [0, 0]; }
+    return CALIB[calibRun.kind].wheels[done < 0.8 ? 0 : 1];
+  }
   function renderCalib() {
     if (!calibRun) return;
-    $('calibReading').textContent = calibRun.kind === 'turn'
-      ? `Encoders: ${Math.abs(calibRun.turn * 180 / Math.PI).toFixed(0)}°`
-      : `Encoders: ${(Math.abs(calibRun.dist) / 10).toFixed(0)} cm`;
+    const spin = calibRun.kind === 'spin';
+    const reading = spin ? `${(Math.abs(calibRun.turn) * 180 / Math.PI).toFixed(0)}° on the encoders`
+      : `${(Math.abs(calibRun.dist) / 10).toFixed(0)} cm on the encoders`;
+    $('calibReading').textContent = reading;
+    if (calibRun.phase === 'moving') {
+      $('calibHelp').textContent = spin ? 'Spinning… it stops by itself.' : 'Driving… it stops by itself.';
+    } else if (calibRun.phase === 'settling') {
+      $('calibHelp').textContent = 'Stopped. Waiting for the last encoder reading…';
+      // The ESP reports every 5 s when still: wait for a reading taken after the stop
+      if (calibRun.lastOdomAt > calibRun.stoppedAt + 300 || Date.now() - calibRun.stoppedAt > 6500) askCalib();
+    }
+  }
+  setInterval(() => { if (calibRun && calibRun.phase === 'settling') renderCalib(); }, 250);
+  function askCalib() {
+    const spin = calibRun.kind === 'spin';
+    calibRun.phase = 'measure';
+    $('calibHelp').textContent = spin
+      ? 'It tried to turn exactly 2 full turns. Compared with where its front started (your tape), how far past it did it stop? Use a minus number if it stopped short.'
+      : 'Measure from the tape to the front of the robot (or to the back, for the back test).';
+    $('calibAsk').textContent = spin ? 'Past the start by' : 'It really went';
+    $('calibUnit').textContent = spin ? '°' : 'cm';
+    $('calibReal').value = spin ? '0' : '100';
+    $('calibAnswer').hidden = false; $('calibDone').hidden = false;
+    $('calibCancel').innerHTML = '<b>Discard</b>';
+    $('calibReal').focus(); $('calibReal').select();
   }
   function startCalib(kind) {
-    if (!rawOdom) { toast('No odometry from the robot yet'); return; }
-    calibRun = { kind, turn: 0, dist: 0 };
+    if (!driveOn) { toast('Turn Drive on first'); return; }
+    if (!rawOdom || Date.now() - odomAt > 8000) { toast('No odometry from the robot yet'); return; }
+    calibRun = { kind, dist: 0, turn: 0, phase: 'moving', target: CALIB[kind].target(), startedAt: Date.now(), lastOdomAt: 0 };
     $('calibPick').hidden = true; $('calibRunning').hidden = false;
-    $('calibRealWrap').hidden = kind !== 'dist';
-    $('calibHelp').textContent = kind === 'turn'
-      ? 'Note which way the robot faces. Spin it in place with the stick until it has turned exactly 2 full turns and faces the same way again, then tap Done.'
-      : 'Mark the floor at the front of the robot. Drive straight 1–2 m, stop, measure how far it really went, enter it, then tap Done.';
+    $('calibAnswer').hidden = true; $('calibDone').hidden = true;
+    $('calibCancel').innerHTML = '<b>Stop</b><small>cancel test</small>';
     renderCalib();
   }
   function endCalib() {
-    calibRun = null; $('calibPick').hidden = false; $('calibRunning').hidden = true; $('calibReal').value = '';
+    calibRun = null; $('calibPick').hidden = false; $('calibRunning').hidden = true;
+    renderCalibNow();
+  }
+  function abortCalib(why) {
+    if (driveOn) { publish(TOPIC_DRIVE, '0,0'); stopRepeats = 3; }
+    toast(why); endCalib();
   }
   $('openCalib').addEventListener('click', () => { $('calib').hidden = false; endCalib(); });
-  $('closeCalib').addEventListener('click', () => { $('calib').hidden = true; endCalib(); });
-  $('calibTurn').addEventListener('click', () => startCalib('turn'));
-  $('calibDist').addEventListener('click', () => startCalib('dist'));
-  $('calibCancel').addEventListener('click', endCalib);
+  $('closeCalib').addEventListener('click', () => { if (calibRun) abortCalib('Test cancelled'); $('calib').hidden = true; });
+  document.querySelectorAll('[data-calib]').forEach((b) => b.addEventListener('click', () => startCalib(b.dataset.calib)));
+  $('calibCancel').addEventListener('click', () => (calibRun && calibRun.phase !== 'measure' ? abortCalib('Test cancelled') : endCalib()));
   $('calibDone').addEventListener('click', () => {
-    if (!calibRun) return;
+    if (!calibRun || calibRun.phase !== 'measure') return;
+    const value = Number($('calibReal').value);
+    if (!Number.isFinite(value)) { toast('Enter a number'); return; }
+    const raw = calibProgress();
     let msg;
-    if (calibRun.kind === 'turn') {
-      const measured = Math.abs(calibRun.turn);
-      if (measured < Math.PI) { toast('Spin at least 2 turns first'); return; }
-      msg = { cmd: 'set_calibration', turn_scale: +(4 * Math.PI / measured).toFixed(3) };
+    if (calibRun.kind === 'spin') {
+      const real = (720 + value) * Math.PI / 180;
+      if (real <= 0) { toast('That would mean it never turned'); return; }
+      msg = { cmd: 'set_calibration', turn_scale: +(real / raw).toFixed(3) };
     } else {
-      const real = Number($('calibReal').value) * 10, measured = Math.abs(calibRun.dist);
-      if (!(real > 100) || measured < 100) { toast('Drive at least 10 cm and enter the real distance'); return; }
-      msg = { cmd: 'set_calibration', dist_scale: +(real / measured).toFixed(3) };
+      if (!(value > 5)) { toast('Enter how far it really went, in cm'); return; }
+      const key = calibRun.kind === 'fwd' ? 'dist_scale' : 'dist_scale_back';
+      msg = { cmd: 'set_calibration', [key]: +((value * 10) / raw).toFixed(3) };
     }
     if (publish('roomba/map/cmd', JSON.stringify(msg))) toast('Calibration saved');
     endCalib();
